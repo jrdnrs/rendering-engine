@@ -13,6 +13,8 @@ use std::{collections::VecDeque, marker::PhantomData};
 pub struct AssetsManager<'a> {
     gl: &'a gl::Context,
 
+    // TODO: I think we should do this differently, using bit keys maybe? This overhead gets much worse when
+    // there are more layers to sort
     /// Shader(ID) > Meshes(ID) > Renderables
     pub shader_buckets: Vec<Vec<Vec<Renderable>>>,
 
@@ -34,6 +36,26 @@ impl<'a> AssetsManager<'a> {
         }
 
         // TODO: load default texture and material
+    }
+
+    /// This is to maintain the structure of the nested vecs that are used as sorting buckets.
+    /// I don't really like this idea, and will probably move to sorting by some derived bit key soon
+    fn refresh_sorting_buckets(&mut self) {
+        // HACK: using mesh/shader alive_count won't hold when we are able to remove meshes/shaders.
+        // what we actually want is the biggest id (index) held by a mesh/shader that is alive, as that is how
+        // many vecs we need. as removing is not implemented, this will just be the number that is alive
+        
+        let delta = self.shader_program_manager.alive_count - self.shader_buckets.len() as u32;
+        for _ in 0..delta {
+            self.shader_buckets.push(Vec::new())
+        }
+
+        for shader_bucket in self.shader_buckets.iter_mut() {
+            let delta = self.mesh_manager.alive_count - shader_bucket.len() as u32;
+            for _ in 0..delta {
+                shader_bucket.push(Vec::new())
+            }
+        }
     }
 
     pub fn load_texture(&mut self, path: &'static str) -> Result<TextureID, String> {
@@ -58,11 +80,10 @@ impl<'a> AssetsManager<'a> {
     pub fn load_shader(&mut self, path: &'static str) -> ShaderProgramID {
         let mut program = shader::Program::new(self.gl);
         program.add_shaders(path);
+        let id = self.shader_program_manager.load(program);
+        self.refresh_sorting_buckets();
 
-        // When adding shader, make sure that each mesh bucket exists for every mesh
-        self.shader_buckets.push(Vec::new());
-
-        self.shader_program_manager.load(program)
+        id
     }
 
     fn remove_shader(&mut self, shader_id: ShaderProgramID) {
@@ -76,13 +97,7 @@ impl<'a> AssetsManager<'a> {
 
     pub fn load_mesh(&mut self, mesh: Mesh) -> MeshID {
         let id = self.mesh_manager.load(mesh);
-
-        // When adding mesh, make sure that each shader bucket has indices for this mesh
-        for shader_bucket in self.shader_buckets.iter_mut() {
-            if id.index() as usize > shader_bucket.len() {
-                shader_bucket.push(Vec::new())
-            }
-        }
+        self.refresh_sorting_buckets();
 
         id
     }

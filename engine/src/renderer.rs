@@ -372,10 +372,6 @@ impl<'a> Renderer<'a> {
         let mesh_buckets =
             &mut self.asset_manager.shader_buckets[renderable.shader_id.index() as usize];
 
-        if renderable.mesh_id.index() as usize >= mesh_buckets.len() {
-            mesh_buckets.push(Vec::new())
-        }
-
         mesh_buckets[renderable.mesh_id.index() as usize].push(renderable.clone());
     }
 

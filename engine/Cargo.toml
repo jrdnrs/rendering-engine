@@ -1,0 +1,17 @@
+[package]
+name = "engine"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+log = {version = "0.4", features = ["max_level_trace", "release_max_level_error"]}
+colored = "2"
+glutin = "0.28.0"
+glow = {git = "https://github.com/jrdnrs/glow"}
+spin_sleep = "1.1.1"
+bytemuck = "1.9.1"
+image = "0.24.2"
+tobj = "3.2.2"
+ecs = {path = "../ecs"}
+memoffset = "0.6"

@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "engine",
+    "ecs",
+]
+
+[profile.dev]
+#opt-level = 3

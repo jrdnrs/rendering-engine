@@ -276,8 +276,7 @@ impl Vec2u {
     }
 }
 
-/// Assumes a left-handed coordinate system
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Mat4f(pub [f32; 16]);
 
 impl Mat4f {
@@ -318,15 +317,33 @@ impl Mat4f {
 
         // transformed Z, Zt = (g * Z + h) / Z
         // division by Z occurs in graphics pipeline
-        let g = (-far - near) / (near - far);
-        let h = (2.0 * far * near) / (near - far);
+        let g = - (far + near) / (far - near);
+        let h = - (2.0 * far * near) / (far - near);
 
         
         Mat4f([
             f / a, 0.0, 0.0, 0.0,
             0.0, f, 0.0, 0.0,
             0.0, 0.0, g, h,
-            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, -1.0, 0.0,
+        ])
+    }
+
+    pub fn orthographic(aspect_ratio: f32, size: f32, near: f32, far: f32) -> Self {
+        let a = aspect_ratio;
+        let w = size;
+        let h = w / a;
+
+        let r = w / 2.0;
+        let l = -r;
+        let t = h / 2.0;
+        let b = -t;
+        
+        Mat4f([
+            2.0 / (r-l), 0.0, 0.0, -(r+l)/(r-l), 
+            0.0, 2.0/(t-b), 0.0, -(t+b)/(t-b), 
+            0.0, 0.0, -2.0/(far-near), -(far + near)/(far - near), 
+            0.0, 0.0, 0.0, 1.0,
         ])
     }
 
@@ -430,74 +447,74 @@ impl Mat4f {
 
 /// Multiplies as if self is on right hand side
 impl std::ops::MulAssign for Mat4f {
-    fn mul_assign(&mut self, rhs: Self) {
-        self.0[0] = rhs.0[0] * self.0[0]
-            + rhs.0[1] * self.0[4]
-            + rhs.0[2] * self.0[8]
-            + rhs.0[3] * self.0[12];
-        self.0[1] = rhs.0[0] * self.0[1]
-            + rhs.0[1] * self.0[5]
-            + rhs.0[2] * self.0[9]
-            + rhs.0[3] * self.0[13];
-        self.0[2] = rhs.0[0] * self.0[2]
-            + rhs.0[1] * self.0[6]
-            + rhs.0[2] * self.0[10]
-            + rhs.0[3] * self.0[14];
-        self.0[3] = rhs.0[0] * self.0[3]
-            + rhs.0[1] * self.0[7]
-            + rhs.0[2] * self.0[11]
-            + rhs.0[3] * self.0[15];
+    fn mul_assign(&mut self, lhs: Self) {
+        self.0[0] = lhs.0[0] * self.0[0]
+            + lhs.0[1] * self.0[4]
+            + lhs.0[2] * self.0[8]
+            + lhs.0[3] * self.0[12];
+        self.0[1] = lhs.0[0] * self.0[1]
+            + lhs.0[1] * self.0[5]
+            + lhs.0[2] * self.0[9]
+            + lhs.0[3] * self.0[13];
+        self.0[2] = lhs.0[0] * self.0[2]
+            + lhs.0[1] * self.0[6]
+            + lhs.0[2] * self.0[10]
+            + lhs.0[3] * self.0[14];
+        self.0[3] = lhs.0[0] * self.0[3]
+            + lhs.0[1] * self.0[7]
+            + lhs.0[2] * self.0[11]
+            + lhs.0[3] * self.0[15];
 
-        self.0[4] = rhs.0[4] * self.0[0]
-            + rhs.0[5] * self.0[4]
-            + rhs.0[6] * self.0[8]
-            + rhs.0[7] * self.0[12];
-        self.0[5] = rhs.0[4] * self.0[1]
-            + rhs.0[5] * self.0[5]
-            + rhs.0[6] * self.0[9]
-            + rhs.0[7] * self.0[13];
-        self.0[6] = rhs.0[4] * self.0[2]
-            + rhs.0[5] * self.0[6]
-            + rhs.0[6] * self.0[10]
-            + rhs.0[7] * self.0[14];
-        self.0[7] = rhs.0[4] * self.0[3]
-            + rhs.0[5] * self.0[7]
-            + rhs.0[6] * self.0[11]
-            + rhs.0[7] * self.0[15];
+        self.0[4] = lhs.0[4] * self.0[0]
+            + lhs.0[5] * self.0[4]
+            + lhs.0[6] * self.0[8]
+            + lhs.0[7] * self.0[12];
+        self.0[5] = lhs.0[4] * self.0[1]
+            + lhs.0[5] * self.0[5]
+            + lhs.0[6] * self.0[9]
+            + lhs.0[7] * self.0[13];
+        self.0[6] = lhs.0[4] * self.0[2]
+            + lhs.0[5] * self.0[6]
+            + lhs.0[6] * self.0[10]
+            + lhs.0[7] * self.0[14];
+        self.0[7] = lhs.0[4] * self.0[3]
+            + lhs.0[5] * self.0[7]
+            + lhs.0[6] * self.0[11]
+            + lhs.0[7] * self.0[15];
 
-        self.0[8] = rhs.0[8] * self.0[0]
-            + rhs.0[9] * self.0[4]
-            + rhs.0[10] * self.0[8]
-            + rhs.0[11] * self.0[12];
-        self.0[9] = rhs.0[8] * self.0[1]
-            + rhs.0[9] * self.0[5]
-            + rhs.0[10] * self.0[9]
-            + rhs.0[11] * self.0[13];
-        self.0[10] = rhs.0[8] * self.0[2]
-            + rhs.0[9] * self.0[6]
-            + rhs.0[10] * self.0[10]
-            + rhs.0[11] * self.0[14];
-        self.0[11] = rhs.0[8] * self.0[3]
-            + rhs.0[9] * self.0[7]
-            + rhs.0[10] * self.0[11]
-            + rhs.0[11] * self.0[15];
+        self.0[8] = lhs.0[8] * self.0[0]
+            + lhs.0[9] * self.0[4]
+            + lhs.0[10] * self.0[8]
+            + lhs.0[11] * self.0[12];
+        self.0[9] = lhs.0[8] * self.0[1]
+            + lhs.0[9] * self.0[5]
+            + lhs.0[10] * self.0[9]
+            + lhs.0[11] * self.0[13];
+        self.0[10] = lhs.0[8] * self.0[2]
+            + lhs.0[9] * self.0[6]
+            + lhs.0[10] * self.0[10]
+            + lhs.0[11] * self.0[14];
+        self.0[11] = lhs.0[8] * self.0[3]
+            + lhs.0[9] * self.0[7]
+            + lhs.0[10] * self.0[11]
+            + lhs.0[11] * self.0[15];
 
-        self.0[12] = rhs.0[12] * self.0[0]
-            + rhs.0[13] * self.0[4]
-            + rhs.0[14] * self.0[8]
-            + rhs.0[15] * self.0[12];
-        self.0[13] = rhs.0[12] * self.0[1]
-            + rhs.0[13] * self.0[5]
-            + rhs.0[14] * self.0[9]
-            + rhs.0[15] * self.0[13];
-        self.0[14] = rhs.0[12] * self.0[2]
-            + rhs.0[13] * self.0[6]
-            + rhs.0[14] * self.0[10]
-            + rhs.0[15] * self.0[14];
-        self.0[15] = rhs.0[12] * self.0[3]
-            + rhs.0[13] * self.0[7]
-            + rhs.0[14] * self.0[11]
-            + rhs.0[15] * self.0[15];
+        self.0[12] = lhs.0[12] * self.0[0]
+            + lhs.0[13] * self.0[4]
+            + lhs.0[14] * self.0[8]
+            + lhs.0[15] * self.0[12];
+        self.0[13] = lhs.0[12] * self.0[1]
+            + lhs.0[13] * self.0[5]
+            + lhs.0[14] * self.0[9]
+            + lhs.0[15] * self.0[13];
+        self.0[14] = lhs.0[12] * self.0[2]
+            + lhs.0[13] * self.0[6]
+            + lhs.0[14] * self.0[10]
+            + lhs.0[15] * self.0[14];
+        self.0[15] = lhs.0[12] * self.0[3]
+            + lhs.0[13] * self.0[7]
+            + lhs.0[14] * self.0[11]
+            + lhs.0[15] * self.0[15];
     }
 }
 

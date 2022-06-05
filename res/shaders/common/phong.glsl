@@ -1,8 +1,13 @@
 #include "res/shaders/common/materialDef.glsl"
 
 struct Light {
+    vec3 ambientCol;
     float ambientStrength;
+    
+    vec3 diffuseCol;
     float diffuseStrength;
+    
+    vec3 specularCol;
     float specularStrength;
 
     // for spotlights
@@ -32,12 +37,12 @@ float calcLightAttenutation(Light light, vec3 fragPos) {
     return lightAttenuation;
 }
 
-vec3 calcAmbientLight(Light light, Material material) {
-    return light.ambientStrength * material.ambientCol;
+vec3 calcAmbientLight(Light light) {
+    return light.ambientStrength * light.ambientCol;
 }
 
 // Diffuse light is based on angle between light ray and surface normal
-vec3 calcDiffuseLight(Light light, Material material, vec3 fragPos, vec3 normal) {
+vec3 calcDiffuseLight(Light light, vec3 fragPos, vec3 normal) {
     // get the vector from the light position to the pixel
     vec3 lightRayDir = normalize(light.position - fragPos); 
 
@@ -45,14 +50,14 @@ vec3 calcDiffuseLight(Light light, Material material, vec3 fragPos, vec3 normal)
     // the steeper the angle, the lower the value
     float diff = max(dot(normal, lightRayDir), 0.0);
 
-    vec3 diffLight = light.diffuseStrength * diff * material.diffuseCol;
+    vec3 diffLight = light.diffuseStrength * diff * light.diffuseCol;
     return diffLight;
 }
 
 // Diffuse light is based on angle between light ray and surface normal.
 // However, this assumes that the light ray is always perpendicular to the actual light's
 // pointing direction
-vec3 calcDiffuseLightDir(Light light, Material material, vec3 fragPos, vec3 normal) {
+vec3 calcDiffuseLightDir(Light light, vec3 fragPos, vec3 normal) {
     // because this is used for directional lighting, the light rays are parrallel and fixed
     vec3 lightRayDir = normalize(-light.direction); 
 
@@ -60,7 +65,7 @@ vec3 calcDiffuseLightDir(Light light, Material material, vec3 fragPos, vec3 norm
     // the steeper the angle, the lower the value
     float diff = max(dot(normal, lightRayDir), 0.0);
 
-    vec3 diffLight = light.diffuseStrength * diff * material.diffuseCol;
+    vec3 diffLight = light.diffuseStrength * diff * light.diffuseCol;
     return diffLight;
 }
 
@@ -75,23 +80,37 @@ vec3 calcSpecularLight(Light light, Material material, vec3 fragPos, vec3 normal
 
     // magic...
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec3 specLight = light.specularStrength * spec * material.specularCol;  
+    vec3 specLight = light.specularStrength * spec * light.specularCol;  
+    return specLight;
+}
+
+// Specular light is based on angle between the surface normal and angle that is midway between view direction
+// and light ray direction
+vec3 calcBlinnSpecularLight(Light light, Material material, vec3 fragPos, vec3 normal, vec3 camPos) {
+    // get the vector from the camera position to the pixel
+    vec3 viewDir = normalize(camPos - fragPos);
+    vec3 lightDir = normalize(light.position - fragPos);
+    vec3 halfwayDir = normalize(viewDir + lightDir);
+
+    // magic...
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
+    vec3 specLight = light.specularStrength * spec * light.specularCol;  
     return specLight;
 }
 
 // Maintains a fixed light ray direction that is perpendicular to the actual light's
 // pointing direction during the diffuse light calculation
 vec3 calcPhongDirLight(Light light, Material material, vec3 fragPos, vec3 normal, vec3 camPos) {
-    vec3 ambientLight = calcAmbientLight(light, material);
-    vec3 diffuseLight = calcDiffuseLightDir(light, material, fragPos, normal);
+    vec3 ambientLight = calcAmbientLight(light);
+    vec3 diffuseLight = calcDiffuseLightDir(light, fragPos, normal);
     vec3 specularLight = calcSpecularLight(light, material, fragPos, normal, camPos);
     return ambientLight + diffuseLight + specularLight;
 }
 
 vec3 calcPhongPointLight(Light light, Material material, vec3 fragPos, vec3 normal, vec3 camPos) {
     float lightAttenuation = calcLightAttenutation(light, fragPos);
-    vec3 ambientLight = calcAmbientLight(light, material);
-    vec3 diffuseLight = calcDiffuseLight(light, material, fragPos, normal);
+    vec3 ambientLight = calcAmbientLight(light);
+    vec3 diffuseLight = calcDiffuseLight(light, fragPos, normal);
     vec3 specularLight = calcSpecularLight(light, material, fragPos, normal, camPos);
     return lightAttenuation * (ambientLight + diffuseLight + specularLight);
 }
@@ -116,8 +135,8 @@ vec3 calcPhongSpotlight(Light light, Material material, vec3 fragPos, vec3 norma
     // we don't ever apply the cutoff to ambient as there should always be ambient light outside
     // of the cutoff
     float lightAttenuation = calcLightAttenutation(light, fragPos);
-    vec3 ambientLight = calcAmbientLight(light, material);
-    vec3 diffuseLight = intensity * calcDiffuseLight(light, material, fragPos, normal);
+    vec3 ambientLight = calcAmbientLight(light);
+    vec3 diffuseLight = intensity * calcDiffuseLight(light, fragPos, normal);
     vec3 specularLight = intensity * calcSpecularLight(light, material, fragPos, normal, camPos);
 
     return lightAttenuation * (ambientLight + diffuseLight + specularLight);

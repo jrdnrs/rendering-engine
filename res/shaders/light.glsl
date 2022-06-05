@@ -15,21 +15,33 @@ out VS_OUT {
     Material material;
 } vs_out;
 
-layout (std430, binding = 0) buffer Vertex {
+layout (std430, binding = 2) buffer Materials {
     Material materials[100];
-    mat4 transforms[1000];
+};
+
+layout (std430, binding = 3) buffer Matrices {
     mat4 projection;
     mat4 view;
-    uint materialIndex[1000];
+};
+
+struct InstanceData {
+    mat4 transform;
+    uint materialIndex;
+};
+
+layout (std430, binding = 4) buffer InstanceDatas {
+    InstanceData instanceData[1000];
 };
 
 void main() {
-    mat4 transform = transforms[a_index];
+    InstanceData thisInstance = instanceData[a_index];
+
+    mat4 transform = thisInstance.transform;
 
     vs_out.fragPos = vec3(transform * vec4(a_position, 1.0));
     vs_out.normal = mat3(transpose(inverse(transform))) * a_normal;
     vs_out.texCoord = a_texCoord;
-    vs_out.material = materials[materialIndex[a_index]];
+    vs_out.material = materials[thisInstance.materialIndex];
 
     gl_Position = projection * view * transform * vec4(a_position, 1.0);
 }
@@ -50,7 +62,7 @@ in VS_OUT {
 
 out vec4 FragColour;
 
-layout (std430, binding = 1) buffer Fragment {
+layout (std430, binding = 0) buffer Lights {
     Light allLights[32];
     int lightCount;
     vec3 cameraDir;
@@ -58,50 +70,26 @@ layout (std430, binding = 1) buffer Fragment {
 };
 
 void main() {
-//     Material material = Material(
-//          vec3(0.95, 0.85, 0.6),
-//          vec3(0.86, 0.77, 0.54),
-//          vec3(0.36, 0.33, 0.3),
-//          8.0
-//     );
-
-//    Light lamp = Light(
-//         vec3(3.0, -3.0, -3.0),
-//         vec3(0.0, 1.0, 0.0),
-//         0.3, 1.33, 0.5,
-//         1.0, 1.0, // cutoff not needed for point light
-//         0.0075, 0.045, 1.0
-//    );
-
-//     Light sun = Light(
-//         vec3(3.0, -3.0, -3.0),
-//         vec3(0.0, 1.0, 0.0),
-//         0.3, 1.33, 0.6,
-//         1.0, 1.0, // cutoff not needed for directional light
-//         1.0, 1.0, 1.0 // attenuation not needed for directional light
-//    );
-
-//     Light flashlight = Light(
-//         cameraPos,
-//         cameraDir,
-//         0.3, 1.33, 0.8,
-//         0.9863, 0.8892,
-//         0.0075, 0.045, 1.0
-//    );
-
-//     vec3 phongLight = calcPhongPointLight(lamp, material, FragPos, cameraPos);
-//     vec3 dirLight = calcPhongDirLight(sun, material, FragPos, cameraPos);
-//     vec3 spotlight = calcPhongSpotlight(flashlight, material, FragPos, cameraPos);
-
-
     vec3 myColour = vec3(texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord));
     vec3 totalLight = vec3(0.0);
 
     for (int i = 0; i < lightCount; i++) {
         float lightAttenuation = calcLightAttenutation(allLights[i], vs_in.fragPos);
-        vec3 ambientLight = myColour * calcAmbientLight(allLights[i], vs_in.material);
-        vec3 diffuseLight = myColour * calcDiffuseLight(allLights[i], vs_in.material, vs_in.fragPos, vs_in.normal);
-        vec3 specularLight = myColour * calcSpecularLight(allLights[i], vs_in.material, vs_in.fragPos, vs_in.normal, cameraPos);
+        vec3 diffuseLight = myColour * calcDiffuseLight(allLights[i], vs_in.fragPos, vs_in.normal);
+        vec3 ambientLight = myColour * calcAmbientLight(allLights[i]);
+        vec3 specularLight = vec3(0.0); 
+
+        vec3 lightDir = normalize(allLights[i].position - vs_in.fragPos);
+        float cosine = dot(vs_in.normal, lightDir);
+        float angle = 180.0 - (cosine + 1.0) / 2.0 * 180.0;
+
+        if (angle > 90.0) {
+            ambientLight = ambientLight * (1.0 - (angle / 180.0 / 1.15) );
+        }
+
+        if (angle <= 90.0) {
+            specularLight = myColour * calcBlinnSpecularLight(allLights[i], vs_in.material, vs_in.fragPos, vs_in.normal, cameraPos);
+        }
 
         totalLight += lightAttenuation * (ambientLight + diffuseLight + specularLight);
     }

@@ -11,59 +11,37 @@ layout(location = 4) in int a_index;
 
 out VS_OUT {
     vec2 texCoord;
-    vec3 normal;
     Material material;
 } vs_out;
 
-layout (std430, binding = 0) buffer Vertex {
+layout (std430, binding = 2) buffer Materials {
     Material materials[100];
-    mat4 transforms[1000];
+};
+
+layout (std430, binding = 3) buffer Matrices {
     mat4 projection;
     mat4 view;
-    uint materialIndex[1000]; // this uses 16 bytes per instead of just 4
+};
+
+struct InstanceData {
+    mat4 transform;
+    uint materialIndex;
+};
+
+layout (std430, binding = 4) buffer InstanceDatas {
+    InstanceData instanceData[1000];
 };
 
 
 void main() {
-    mat4 transform = transforms[a_index];
+    InstanceData thisInstance = instanceData[a_index];
 
-    vs_out.normal = a_normal;
+    mat4 transform = thisInstance.transform;
+
     vs_out.texCoord = a_texCoord;
-    vs_out.material = materials[materialIndex[a_index]];
+    vs_out.material = materials[thisInstance.materialIndex];
 
     gl_Position = projection * view * transform * vec4(a_position, 1.0);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-#shader geometry
-#version 460 core
-#include "res/shaders/common/materialDef.glsl"
-
-layout(triangles) in;
-layout(triangle_strip, max_vertices = 3) out;
-
-in VS_OUT {
-    vec2 texCoord;
-    vec3 normal;
-    Material material;
-} vs_in[];
-
-
-out GS_OUT {
-    vec2 texCoord;
-    Material material;
-} gs_out;
-
-
-void main() {
-    for (int i = 0; i < gl_in.length(); i++) {
-        gs_out.texCoord = vs_in[i].texCoord;
-        gs_out.material = vs_in[i].material;
-        gl_Position = gl_in[i].gl_Position;
-        EmitVertex();
-    }
-
-    EndPrimitive();
 }
 
 
@@ -73,13 +51,14 @@ void main() {
 #extension GL_ARB_bindless_texture : require
 #include "res/shaders/common/materialDef.glsl"
 
-in GS_OUT {
+in VS_OUT {
     vec2 texCoord;
     Material material;
-} gs_in;
+} vs_in;
 
 out vec4 FragColour;
 
 void main() {
-    FragColour = texture(sampler2D(gs_in.material.diffuseTexture), gs_in.texCoord);
+    // FragColour = vec4(0.5, 0.2, 0.8, 1.0);
+    FragColour = texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord);
 }

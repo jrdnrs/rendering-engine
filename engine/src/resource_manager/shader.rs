@@ -1,10 +1,11 @@
+use std::collections::HashMap;
+
 use colored::*;
 use gl::UniformLocation;
 use glow::{self as gl, HasContext};
 use log::{debug, error};
-use std::collections::HashMap;
 
-use crate::math::Mat4f;
+use crate::math::math::Mat4f;
 
 pub fn shader_data_element_count(type_: &ShaderDataType) -> i32 {
     match type_ {
@@ -124,7 +125,7 @@ impl ShaderBuilder {
                 Some((st, _)) => {
                     return Err(format!("Unknown Shader Type Declared '{st}'")
                         .red()
-                        .to_string())
+                        .to_string());
                 }
                 _ => continue,
             };

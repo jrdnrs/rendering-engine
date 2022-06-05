@@ -1,7 +1,7 @@
 use glow::{self as gl, HasContext};
 use log::{error, trace};
 
-use super::asset::shader::{
+use crate::resource_manager::shader::{
     shader_data_element_count, shader_data_gl_type, shader_data_size_bytes, ShaderDataType,
 };
 
@@ -497,7 +497,7 @@ impl<'a> BufferStorage<'a> {
         self.buffer_index = 0;
     }
 
-    /// Wraps buffer_index if the required size_bytes can not fit contigiously in the buffer and waits for any 
+    /// Wraps buffer_index if the required size_bytes can not fit contigiously in the buffer and waits for any
     /// fences associated with the range to be met.
     pub fn reserve(&mut self, size_bytes: i32) {
         if self.buffer_index + size_bytes > self.section_size_bytes {

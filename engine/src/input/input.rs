@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
-use glutin::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode};
 use std::collections::HashMap;
+
+use glutin::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode};
 
 pub enum KeyAction {
     Held,

@@ -1,18 +1,18 @@
 use std::{
     any::{self, TypeId},
     collections::HashMap,
-    slice::IterMut, iter::Zip, time,
+    iter::Zip,
+    slice::IterMut,
+    time,
 };
 
-use crate::component::*;
-use crate::entity::*;
-use crate::system::*;
+use crate::{component::*, entity::*, system::*};
 pub struct World {
     entity_manager: EntityManager,
     system_manager: SystemManager,
     views: HashMap<String, View>,
     current_view_name: String,
-    time: time::Instant
+    time: time::Instant,
 }
 
 impl World {
@@ -162,7 +162,9 @@ impl View {
         }
     }
 
-    pub fn iter_two_components_mut_zip<A, B>(&mut self) -> Result<Zip<IterMut<A>, IterMut<B>>, String>
+    pub fn iter_two_components_mut_zip<A, B>(
+        &mut self,
+    ) -> Result<Zip<IterMut<A>, IterMut<B>>, String>
     where
         A: Component,
         B: Component,

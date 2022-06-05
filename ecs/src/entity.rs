@@ -44,9 +44,7 @@ impl EntityManager {
             self.entity_versions.push(0);
             id = self.entity_versions.len() as u32 - 1;
         }
-        Entity {
-            id,
-        }
+        Entity { id }
     }
 
     #[inline]

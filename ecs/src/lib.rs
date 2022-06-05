@@ -1,13 +1,13 @@
+mod archetype;
 mod component;
 mod entity;
 mod system;
 mod world;
-mod archetype;
 
 use std::time;
 
-pub use world::*;
 pub use entity::*;
+pub use world::*;
 
 #[derive(Debug)]
 struct Position {

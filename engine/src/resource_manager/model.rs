@@ -1,11 +1,9 @@
 use bytemuck::{Pod, Zeroable};
 
-use crate::math::*;
-
-use super::TextureID;
+use super::resource_manager::TextureID;
+use crate::math::math::*;
 
 pub const VERTEX_SIZE: i32 = std::mem::size_of::<Vertex>() as i32;
-
 
 pub struct Model {
     pub meshes: Vec<Mesh>,
@@ -17,9 +15,6 @@ pub struct Mesh {
 }
 
 pub struct Material {
-    pub ambient_col: Vec3f,
-    pub diffuse_col: Vec3f,
-    pub specular_col: Vec3f,
     pub shininess: f32,
     pub diffuse_texture_id: TextureID,
     pub specular_texture_id: TextureID,

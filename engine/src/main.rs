@@ -1,22 +1,25 @@
 #![allow(dead_code)]
 
-mod camera;
 mod components;
 mod context;
 mod engine;
 mod input;
-mod loader;
 mod math;
+mod memory_manager;
 mod renderer;
+mod resource_manager;
 mod util;
+mod graphics;
 
+use colored::Colorize;
 use context::Context;
 use engine::Engine;
 
-use colored::Colorize;
-
 const FPS: f32 = 30.0;
 const VSYNC: bool = true;
+const SAMPLES: u16 = 4;
+const WIDTH: i32 = 1600;
+const HEIGHT: i32 = 900;
 
 static LOGGER: Logger = Logger;
 

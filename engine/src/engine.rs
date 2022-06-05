@@ -1,17 +1,23 @@
-use crate::camera;
-use crate::components;
-use crate::context::Context;
-use crate::input::Input;
-use crate::math::*;
-use crate::renderer::{_cube::cube_mesh, asset::model::Material, Renderer};
-use ecs::World;
-
-use glow::{self as gl, HasContext};
-use glutin::event::{DeviceEvent, Event, MouseButton, VirtualKeyCode, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::platform::run_return::EventLoopExtRunReturn;
-use log::debug;
 use std::time;
+
+use ecs::World;
+use glow::{self as gl, HasContext};
+use glutin::{
+    event::{DeviceEvent, Event, MouseButton, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    platform::run_return::EventLoopExtRunReturn,
+};
+use log::debug;
+
+use crate::{
+    components,
+    context::Context,
+    input::input::Input,
+    math::math::*,
+    memory_manager::uniform_layouts::Light,
+    renderer::{pipeline_stages, renderer::Renderer},
+    resource_manager::{model::Material, prefabs::{unit_cube_mesh, self}, texture::TextureConfig},
+};
 
 pub struct Engine<'a> {
     gl: &'a gl::Context,
@@ -19,10 +25,6 @@ pub struct Engine<'a> {
     renderer: Renderer<'a>,
     input: Input,
     world: World,
-
-    // TEMP /////
-    camera: camera::FreeCamera,
-    /////////////
 }
 
 impl<'a> Engine<'a> {
@@ -30,7 +32,6 @@ impl<'a> Engine<'a> {
         Engine {
             context,
             gl,
-            camera: camera::FreeCamera::new_perspective(70.0, 1.0, 100.0),
             renderer: Renderer::new(gl),
             input: Input::new(),
             world: World::new(),
@@ -74,20 +75,22 @@ impl<'a> Engine<'a> {
                 let x = self.input.mouse.delta_x as f32 * sensitivity;
                 let y = self.input.mouse.delta_y as f32 * sensitivity;
 
-                self.camera.yaw += x;
-                self.camera.pitch += y;
+                self.renderer.camera.yaw += x;
+                self.renderer.camera.pitch += y;
 
-                if self.camera.pitch > 89.0 {
-                    self.camera.pitch = 89.0
+                if self.renderer.camera.pitch > 89.0 {
+                    self.renderer.camera.pitch = 89.0
                 };
-                if self.camera.pitch < -89.0 {
-                    self.camera.pitch = -89.0
+                if self.renderer.camera.pitch < -89.0 {
+                    self.renderer.camera.pitch = -89.0
                 };
 
-                self.camera.direction = Vec3f::new(
-                    self.camera.yaw.to_radians().cos() * self.camera.pitch.to_radians().cos(),
-                    self.camera.pitch.to_radians().sin(),
-                    self.camera.yaw.to_radians().sin() * self.camera.pitch.to_radians().cos(),
+                self.renderer.camera.direction = Vec3f::new(
+                    self.renderer.camera.yaw.to_radians().cos()
+                        * self.renderer.camera.pitch.to_radians().cos(),
+                    self.renderer.camera.pitch.to_radians().sin(),
+                    self.renderer.camera.yaw.to_radians().sin()
+                        * self.renderer.camera.pitch.to_radians().cos(),
                 )
                 .normalise();
 
@@ -108,17 +111,24 @@ impl<'a> Engine<'a> {
 
             if self.input.is_key_down(VirtualKeyCode::F2) {
                 debug!("Reloading shaders");
-                for p in self.renderer.asset_manager.shader_program_manager.assets.iter_mut() {
+                for p in self
+                    .renderer
+                    .resources_manager
+                    .shader_program_manager
+                    .resources
+                    .iter_mut()
+                {
                     p.reload();
                 }
             }
 
             if self.input.is_key_down(VirtualKeyCode::W) {
-                self.camera.position += self.camera.direction.scalar(move_speed);
+                self.renderer.camera.position -= self.renderer.camera.direction.scalar(move_speed);
             }
 
             if self.input.is_key_down(VirtualKeyCode::A) {
-                self.camera.position -= self
+                self.renderer.camera.position += self
+                    .renderer
                     .camera
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
@@ -127,11 +137,12 @@ impl<'a> Engine<'a> {
             }
 
             if self.input.is_key_down(VirtualKeyCode::S) {
-                self.camera.position -= self.camera.direction.scalar(move_speed);
+                self.renderer.camera.position += self.renderer.camera.direction.scalar(move_speed);
             }
 
             if self.input.is_key_down(VirtualKeyCode::D) {
-                self.camera.position += self
+                self.renderer.camera.position -= self
+                    .renderer
                     .camera
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
@@ -140,55 +151,57 @@ impl<'a> Engine<'a> {
             }
 
             if self.input.is_key_down(VirtualKeyCode::Space) {
-                self.camera.position -= Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
+                self.renderer.camera.position += Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
             }
 
             if self.input.is_key_down(VirtualKeyCode::LShift) {
-                self.camera.position += Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
+                self.renderer.camera.position -= Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
             }
         }
     }
 
     /// This runs once before rendering occurs
     fn setup(&mut self) {
-        self.renderer.set_clear_colour(0.4, 0.5, 0.9, 0.0);
+        self.renderer.set_clear_colour(0.4, 0.5, 0.9, 1.0);
         let window_size = self.context.window_context.window().inner_size();
-        self.renderer.projection_transform = Mat4f::perspective(
-            window_size.width as f32 / window_size.height as f32,
-            70.0f32.to_radians(),
-            1.0,
-            100.0,
-        );
+        self.renderer
+            .set_viewport(window_size.width as i32, window_size.height as i32);
 
         let lamp_texture_id = self
             .renderer
-            .load_texture("res/textures/lamp.jpg")
+            .load_texture(
+                "res/textures/lamp.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: true,
+                    ..Default::default()
+                },
+            )
             .unwrap();
         let ground_texture_id = self
             .renderer
-            .load_texture("res/textures/planks_oak.jpg")
+            .load_texture(
+                "res/textures/cobblestone_mossy.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: true,
+                    ..Default::default()
+                },
+            )
             .unwrap();
 
-        let basic_shader_id = self
-            .renderer
-            .load_shader("res/shaders/basic.glsl");
-        let light_shader_id = self
-            .renderer
-            .load_shader("res/shaders/light.glsl");
+        let debug_shader_id = self.renderer.load_shader("res/shaders/debug.glsl");
+        let basic_shader_id = self.renderer.load_shader("res/shaders/basic.glsl");
+        let light_shader_id = self.renderer.load_shader("res/shaders/light.glsl");
+        let skybox_shader_id = self.renderer.load_shader("res/shaders/skybox.glsl");
 
         let ground_material_id = self.renderer.load_material(Material {
-            ambient_col: Vec3f::new(0.2, 0.85, 0.3),
-            diffuse_col: Vec3f::new(0.95, 0.85, 0.65),
-            specular_col: Vec3f::new(0.5, 0.5, 0.5),
-            shininess: 4.0,
+            shininess: 16.0,
             diffuse_texture_id: ground_texture_id,
             specular_texture_id: ground_texture_id,
         });
 
         let lamp_material_id = self.renderer.load_material(Material {
-            ambient_col: Vec3f::new(0.95, 0.85, 0.65),
-            diffuse_col: Vec3f::new(0.95, 0.85, 0.65),
-            specular_col: Vec3f::new(0.5, 0.5, 0.5),
             shininess: 32.0,
             diffuse_texture_id: lamp_texture_id,
             specular_texture_id: lamp_texture_id,
@@ -196,11 +209,47 @@ impl<'a> Engine<'a> {
 
         let cube_model_id = self
             .renderer
-            .load_mesh(cube_mesh(Vec4f::new(0.95, 0.85, 0.65, 0.85)));
+            .load_mesh(unit_cube_mesh(Vec4f::new(0.95, 0.85, 0.65, 0.85)));
 
         self.world.register_component::<components::LightBlock>();
         self.world.register_component::<components::Block>();
         self.world.register_component::<components::Renderable>();
+
+        let skybox_texture_id = self
+            .renderer
+            .load_skybox_textures(
+                [
+                    "res/textures/skybox/CoriolisNight/px.dds",
+                    "res/textures/skybox/CoriolisNight/nx.dds",
+                    "res/textures/skybox/CoriolisNight/py.dds",
+                    "res/textures/skybox/CoriolisNight/ny.dds",
+                    "res/textures/skybox/CoriolisNight/pz.dds",
+                    "res/textures/skybox/CoriolisNight/nz.dds",
+                ],
+                &TextureConfig {
+                    wrap: gl::CLAMP_TO_EDGE,
+                    mag_filter: gl::LINEAR,
+                    min_filter: gl::LINEAR,
+                    srgb: true,
+                },
+            )
+            .unwrap();
+
+        let skybox_material_id = self.renderer.load_material(Material {
+            shininess: 0.0,
+            diffuse_texture_id: skybox_texture_id,
+            specular_texture_id: skybox_texture_id,
+        });
+
+        let skybox = self.world.create_entity();
+        let skybox_component = components::Renderable {
+            mesh_id: cube_model_id,
+            material_id: skybox_material_id,
+            shader_id: skybox_shader_id,
+            transform: Mat4f::identity(),
+            pipeline_stages: pipeline_stages::STAGE_SKY,
+        };
+        _ = self.world.set_component(&skybox, skybox_component);
 
         let cubes = 25;
         let mut position = Vec3f::new(0.0, 0.0, 5.0);
@@ -224,6 +273,7 @@ impl<'a> Engine<'a> {
                         material_id: ground_material_id,
                         shader_id: light_shader_id,
                         transform: Mat4f::translate(position.x, position.y, position.z),
+                        pipeline_stages: pipeline_stages::STAGE_SCENE,
                     },
                 );
 
@@ -239,7 +289,8 @@ impl<'a> Engine<'a> {
                 mesh_id: cube_model_id,
                 material_id: lamp_material_id,
                 shader_id: basic_shader_id,
-                transform: Mat4f::translate(20.0, -4.0, -16.0),
+                transform: Mat4f::translate(20.0, 4.0, -16.0),
+                pipeline_stages: pipeline_stages::STAGE_SCENE,
             },
         );
 
@@ -251,7 +302,8 @@ impl<'a> Engine<'a> {
                 mesh_id: cube_model_id,
                 material_id: lamp_material_id,
                 shader_id: basic_shader_id,
-                transform: Mat4f::translate(0.0, -4.0, -16.0),
+                transform: Mat4f::translate(4.0, 4.0, -16.0),
+                pipeline_stages: pipeline_stages::STAGE_SCENE,
             },
         );
 
@@ -263,7 +315,8 @@ impl<'a> Engine<'a> {
                 mesh_id: cube_model_id,
                 material_id: lamp_material_id,
                 shader_id: basic_shader_id,
-                transform: Mat4f::translate(20.0, -4.0, 0.0),
+                transform: Mat4f::translate(20.0, 4.0, 0.0),
+                pipeline_stages: pipeline_stages::STAGE_SCENE,
             },
         );
 
@@ -275,9 +328,22 @@ impl<'a> Engine<'a> {
                 mesh_id: cube_model_id,
                 material_id: lamp_material_id,
                 shader_id: basic_shader_id,
-                transform: Mat4f::translate(0.0, -4.0, 0.0),
+                transform: Mat4f::translate(4.0, 4.0, 0.0),
+                pipeline_stages: pipeline_stages::STAGE_SCENE,
             },
         );
+
+        let axis_mesh = prefabs::axis();
+        let axis_mesh_id = self.renderer.load_mesh(axis_mesh);
+
+        let axis = self.world.create_entity();
+        _ = self.world.set_component(&axis, components::Renderable{
+            mesh_id: axis_mesh_id,
+            material_id: lamp_material_id,
+            shader_id: debug_shader_id,
+            transform: Mat4f::translate(0.0, 0.0, 0.0),
+            pipeline_stages: pipeline_stages::STAGE_DEBUG,
+        })
     }
 
     /// This runs once per frame
@@ -289,27 +355,31 @@ impl<'a> Engine<'a> {
     }
 
     fn draw(&mut self) {
-        self.renderer.clear();
-        self.camera.update_view();
-        self.renderer.begin(
-            self.camera.view.clone(),
-            self.camera.position,
-            self.camera.direction,
-        );
+        self.renderer.begin();
 
-        // TODO: need a better way to update light positions in renderer
-        self.renderer.light_positions.clear();
         for (_light_block, renderable) in self
             .world
             .get_current_view_mut()
             .iter_two_components_mut::<components::LightBlock, components::Renderable>()
             .unwrap()
         {
-            self.renderer.light_positions.push(Vec3f::new(
-                renderable.transform.0[3],
-                renderable.transform.0[7],
-                renderable.transform.0[11],
-            ));
+            self.renderer.add_light(Light {
+                ambient_col: Vec3f::new(0.91, 0.65, 0.36),
+                ambient_strength: 0.15,
+                diffuse_col: Vec3f::new(0.91, 0.65, 0.36),
+                diffuse_strength: 1.5,
+                specular_col: Vec3f::new(0.5, 0.5, 0.5),
+                specular_strength: 0.5,
+                quadratic: 0.07,
+                linear: 0.14,
+                constant: 1.0,
+                position: Vec3f::new(
+                    renderable.transform.0[3],
+                    renderable.transform.0[7],
+                    renderable.transform.0[11],
+                ),
+                ..Default::default()
+            })
         }
 
         for renderable in self
@@ -332,7 +402,13 @@ impl<'a> Engine<'a> {
 
             match event {
                 Event::LoopDestroyed => {
-                    for p in self.renderer.asset_manager.shader_program_manager.assets.iter() {
+                    for p in self
+                        .renderer
+                        .resources_manager
+                        .shader_program_manager
+                        .resources
+                        .iter()
+                    {
                         p.delete();
                     }
                     return;

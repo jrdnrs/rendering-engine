@@ -33,11 +33,12 @@ impl Context {
 
             let window_builder = glutin::window::WindowBuilder::new()
                 .with_title("Hello world!")
-                .with_inner_size(glutin::dpi::LogicalSize::new(1280.0, 720.0));
+                .with_inner_size(glutin::dpi::LogicalSize::new(crate::WIDTH, crate::HEIGHT));
 
             let window_context = glutin::ContextBuilder::new()
                 .with_vsync(crate::VSYNC)
                 .with_double_buffer(Some(true))
+                // .with_multisampling(crate::SAMPLES)
                 .with_gl_profile(glutin::GlProfile::Core)
                 .with_gl(glutin::GlRequest::Latest)
                 .build_windowed(window_builder, &event_loop)

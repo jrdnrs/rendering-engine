@@ -3,7 +3,7 @@ use bytemuck::{Pod, Zeroable};
 use super::resource_manager::TextureID;
 use crate::math::math::*;
 
-pub const VERTEX_SIZE: i32 = std::mem::size_of::<Vertex>() as i32;
+pub const VERTEX_SIZE: u32 = std::mem::size_of::<Vertex>() as u32;
 
 pub struct Model {
     pub meshes: Vec<Mesh>,

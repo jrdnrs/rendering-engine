@@ -23,7 +23,7 @@ pub struct SceneStage<'a> {
     renderables: Vec<Renderable>,
     command_queue: DrawCommands,
     total_instance_count: u32,
-    pending_indirect_command_count: i32,
+    pending_indirect_command_count: u32,
 }
 
 impl<'a> SceneStage<'a> {
@@ -174,8 +174,8 @@ fn upload_draw_data(
 ) {
     let mesh = resource_manager.borrow_mesh(&renderable.mesh_id).unwrap();
 
-    memory_manager.reserve_vertex_space(mesh.vertices.len() as i32);
-    memory_manager.reserve_index_space(mesh.indices.len() as i32);
+    memory_manager.reserve_vertex_space(mesh.vertices.len() as u32);
+    memory_manager.reserve_index_space(mesh.indices.len() as u32);
     let indirect_command = DrawElementsIndirectCommand {
         count: mesh.indices.len() as u32,
         instance_count,
@@ -188,14 +188,14 @@ fn upload_draw_data(
     memory_manager.push_index_slice(&mesh.indices);
 }
 
-fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: i32) {
+fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: u32) {
     unsafe {
         gl.multi_draw_elements_indirect_offset(
             gl::TRIANGLES,
             gl::UNSIGNED_INT,
-            (memory_manager.get_indirect_command_index() as i32 - command_count)
-                * DRAW_COMMAND_SIZE,
-            command_count,
+            (memory_manager.get_indirect_command_index() 
+                - command_count ) as u64 * DRAW_COMMAND_SIZE as u64,
+            command_count as i32,
             0,
         );
     }

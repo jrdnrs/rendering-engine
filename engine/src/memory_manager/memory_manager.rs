@@ -11,23 +11,23 @@ use crate::{
 };
 
 /// The number of sections
-pub const BUFFERS: i32 = 2;
+pub const BUFFERS: u32 = 2;
 
 /// Not sure... <br>
 /// Thought this would end up being vertices per frame, but seems it ends up acting as vertices per mesh
 /// or MultiDrawIndirect call)?? Or it's neither - by virtue of the buffer being created as a vertex buffer, maybe
 /// the writes are DMAd straight away and so I can just overwrite the buffer willynilly because the data has already
 /// been moved?
-const MAX_VERTICES: i32 = 500;
+const MAX_VERTICES: u32 = 500;
 
 /// Commands per frame
-const MAX_COMMANDS: i32 = 1_000;
+const MAX_COMMANDS: u32 = 1_000;
 
-pub const DRAW_COMMAND_SIZE: i32 = size_of::<DrawElementsIndirectCommand>() as i32;
+pub const DRAW_COMMAND_SIZE: u32 = size_of::<DrawElementsIndirectCommand>() as u32;
 
-const BUFFER_SIZE: i32 = VERTEX_SIZE * MAX_VERTICES;
-const INDIRECT_BUFFER_SIZE: i32 = DRAW_COMMAND_SIZE * MAX_COMMANDS;
-const SHADER_STORAGE_BUFFER_SIZE: i32 = size_of::<ShaderStorageBuffers>() as i32;
+const BUFFER_SIZE: u32 = VERTEX_SIZE * MAX_VERTICES;
+const INDIRECT_BUFFER_SIZE: u32 = DRAW_COMMAND_SIZE * MAX_COMMANDS;
+const SHADER_STORAGE_BUFFER_SIZE: u32 = size_of::<ShaderStorageBuffers>() as u32;
 
 #[repr(C)]
 pub struct DrawElementsIndirectCommand {
@@ -72,13 +72,14 @@ impl<'a> MemoryManager<'a> {
                 SHADER_STORAGE_BUFFER_SIZE,
                 1,
             ),
-            buffer_lock: BufferLockManager::new(gl, 0),
+            buffer_lock: BufferLockManager::new(gl),
         };
 
         mm.indirect_draw_buffer.bind();
-        mm.shader_storage_buffer.bind();
         mm.vertex_array.bind();
-        mm.vertex_array.vertex_buffer.bind();
+        // mm.vertex_array.index_buffer.bind();
+        // mm.vertex_array.vertex_buffer.bind();
+        // mm.shader_storage_buffer.bind();
 
         unsafe {
             mm.gl.bind_buffer_range(
@@ -145,13 +146,13 @@ impl<'a> MemoryManager<'a> {
             .wait_for_locked_range(self.indirect_draw_buffer.current_section, 1);
     }
 
-    pub fn reserve_vertex_space(&mut self, vertex_count: i32) {
+    pub fn reserve_vertex_space(&mut self, vertex_count: u32) {
         self.vertex_array
             .vertex_buffer
             .reserve(vertex_count * VERTEX_SIZE);
     }
 
-    pub fn reserve_index_space(&mut self, index_count: i32) {
+    pub fn reserve_index_space(&mut self, index_count: u32) {
         self.vertex_array.index_buffer.reserve(index_count * 4);
     }
 
@@ -159,7 +160,7 @@ impl<'a> MemoryManager<'a> {
         (self
             .vertex_array
             .vertex_buffer
-            .current_section_buffer_index()
+            .current_buffer_index()
             / VERTEX_SIZE) as u32
     }
 
@@ -167,12 +168,16 @@ impl<'a> MemoryManager<'a> {
         (self
             .vertex_array
             .index_buffer
-            .current_section_buffer_index()
+            .current_buffer_index()
             / 4) as u32
     }
 
     pub fn get_indirect_command_index(&mut self) -> u32 {
-        (self.indirect_draw_buffer.current_section_buffer_index() / DRAW_COMMAND_SIZE) as u32
+        (self.indirect_draw_buffer.current_buffer_index() / DRAW_COMMAND_SIZE) as u32
+    }
+
+    pub fn get_indirect_command_address(&mut self) -> u64 {
+        self.indirect_draw_buffer.current_buffer_address()
     }
 
     pub fn push_vertex_data<T>(&mut self, data: &T) {

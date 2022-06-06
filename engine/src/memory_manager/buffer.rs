@@ -1,8 +1,13 @@
+use std::mem::size_of;
+
 use glow::{self as gl, HasContext};
 use log::{error, trace};
 
-use crate::resource_manager::shader::{
-    shader_data_element_count, shader_data_gl_type, shader_data_size_bytes, ShaderDataType,
+use crate::resource_manager::{
+    model::VERTEX_SIZE,
+    shader::{
+        shader_data_element_count, shader_data_gl_type, shader_data_size_bytes, ShaderDataType,
+    },
 };
 
 pub fn gl_buffer_target(target: u32) -> &'static str {
@@ -236,7 +241,7 @@ pub struct VertexArray<'a> {
 }
 
 impl<'a> VertexArray<'a> {
-    pub fn new(gl: &'a gl::Context, layout: BufferLayout, size: i32, multiple: i32) -> Self {
+    pub fn new(gl: &'a gl::Context, layout: BufferLayout, size: u32, multiple: u32) -> Self {
         let vao = unsafe { gl.create_vertex_array().unwrap() };
 
         // TODO: These should definitely not all be the same size...
@@ -250,8 +255,10 @@ impl<'a> VertexArray<'a> {
             vertex_buffer: vbo,
             index_buffer: ebo,
         };
+        vertex_array.bind();
         vertex_array.attach_vertex_buffers();
         vertex_array.attach_index_buffer();
+        vertex_array.unbind();
 
         vertex_array
     }
@@ -277,55 +284,126 @@ impl<'a> VertexArray<'a> {
     //     self.index_buffer.update_and_push_data(indices, offset);
     // }
 
+    // self.bind();
+    // self.vertex_buffer.bind();
+
+    // for (i, element) in self.layout.elements.iter().enumerate() {
+    //     unsafe {
+    //         self.gl.vertex_attrib_pointer_f32(
+    //             i as u32,
+    //             element.count,
+    //             shader_data_gl_type(&element.type_),
+    //             false,
+    //             self.layout.stride,
+    //             element.offset,
+    //         );
+    //         self.gl.enable_vertex_attrib_array(i as u32);
+    //     }
+    // }
+
+    // unsafe {
+    //     const INDEX_LIMIT: usize = 1_000;
+
+    //     let mut indices: [u16; INDEX_LIMIT] = [0; INDEX_LIMIT];
+    //     for i in 0..INDEX_LIMIT {
+    //         indices[i] = i as u16;
+    //     }
+
+    //     let data: &[u8] = bytemuck::cast_slice(&indices);
+
+    //     let vbo = self.gl.create_buffer().unwrap();
+    //     self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));
+    //     self.gl
+    //         .buffer_data_u8_slice(gl::ARRAY_BUFFER, data, gl::STATIC_DRAW);
+
+    //     let attr_index = self.layout.elements.len() as u32;
+    //     self.gl
+    //         .vertex_attrib_pointer_i32(attr_index, 1, gl::UNSIGNED_SHORT, 2, 0);
+    //     self.gl.vertex_attrib_divisor(attr_index, 1);
+    //     self.gl.enable_vertex_attrib_array(attr_index);
+    // }
+
     fn attach_vertex_buffers(&self) {
-        self.bind();
-        self.vertex_buffer.bind();
+        unsafe {
+            self.gl.vertex_array_vertex_buffer(
+                self.handle,
+                0,
+                Some(self.vertex_buffer.handle),
+                0,
+                self.layout.stride,
+            )
+        }
 
         for (i, element) in self.layout.elements.iter().enumerate() {
             unsafe {
-                self.gl.vertex_attrib_pointer_f32(
+                self.gl.vertex_array_attrib_format_f32(
+                    self.handle,
                     i as u32,
                     element.count,
                     shader_data_gl_type(&element.type_),
                     false,
-                    self.layout.stride,
-                    element.offset,
+                    element.offset as u32,
                 );
-                self.gl.enable_vertex_attrib_array(i as u32);
+                self.gl
+                    .vertex_array_attrib_binding_f32(self.handle, i as u32, 0);
+                self.gl.enable_vertex_array_attrib(self.handle, i as u32);
             }
         }
 
         unsafe {
             const INDEX_LIMIT: usize = 1_000;
 
-            let mut indices: [u16; INDEX_LIMIT] = [0; INDEX_LIMIT];
+            let mut indices: [u32; INDEX_LIMIT] = [0; INDEX_LIMIT];
             for i in 0..INDEX_LIMIT {
-                indices[i] = i as u16;
+                indices[i] = i as u32;
             }
 
             let data: &[u8] = bytemuck::cast_slice(&indices);
 
-            let vbo = self.gl.create_buffer().unwrap();
-            self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));
+
+
+            // BUG: Maybe it's a bug, when using the DSA variant of the code below, use of UNSIGNED_SHORT causes strange 
+            // behaviour where some indices don't show. The non-DSA code works fine with UNSIGNED_SHORT...
+
+            //     let vbo = self.gl.create_buffer().unwrap();
+            //     self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));
+            //     self.gl
+            //         .buffer_data_u8_slice(gl::ARRAY_BUFFER, data, gl::STATIC_DRAW);
+
+            //     let attr_index = self.layout.elements.len() as u32;
+            //     self.gl
+            //         .vertex_attrib_pointer_i32(attr_index, 1, gl::UNSIGNED_SHORT, 2, 0);
+            //     self.gl.vertex_attrib_divisor(attr_index, 1);
+            //     self.gl.enable_vertex_attrib_array(attr_index);
+
+            let mut vbo =
+                BufferStorage::new(self.gl, gl::ARRAY_BUFFER, data.len() as u32, 1);
+            vbo.push_data_slice(data);
             self.gl
-                .buffer_data_u8_slice(gl::ARRAY_BUFFER, data, gl::STATIC_DRAW);
+                .vertex_array_vertex_buffer(self.handle, 1, Some(vbo.handle), 0, 4);
 
             let attr_index = self.layout.elements.len() as u32;
+            self.gl.vertex_array_attrib_format_i32(
+                self.handle,
+                attr_index,
+                1,
+                gl::UNSIGNED_INT,
+                0,
+            );
             self.gl
-                .vertex_attrib_pointer_i32(attr_index, 1, gl::UNSIGNED_SHORT, 2, 0);
-            self.gl.vertex_attrib_divisor(attr_index, 1);
-            self.gl.enable_vertex_attrib_array(attr_index);
-        }
+                .vertex_array_attrib_binding_f32(self.handle, attr_index, 1);
+            self.gl.enable_vertex_array_attrib(self.handle, attr_index);
 
-        self.unbind();
-        self.vertex_buffer.unbind();
+            self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo.handle));
+            self.gl.vertex_array_binding_divisor(self.handle, 1, 1);
+        }
     }
 
     fn attach_index_buffer(&self) {
-        self.bind();
-        self.index_buffer.bind();
-        self.unbind();
-        self.index_buffer.unbind();
+        unsafe {
+            self.gl
+                .vertex_array_element_buffer(self.handle, Some(self.index_buffer.handle))
+        }
     }
 
     pub fn bind(&self) {
@@ -338,29 +416,25 @@ impl<'a> VertexArray<'a> {
 }
 
 pub struct BufferLock {
-    start: i32,
-    length: i32,
+    start: u32,
+    length: u32,
     fence_handle: gl::Fence,
 }
 
 pub struct BufferLockManager<'a> {
     pub gl: &'a gl::Context,
     pub buffer_locks: Vec<BufferLock>,
-
-    // temp for debug
-    pub buffer_target: u32,
 }
 
 impl<'a> BufferLockManager<'a> {
-    pub fn new(gl: &'a gl::Context, buffer_target: u32) -> Self {
+    pub fn new(gl: &'a gl::Context) -> Self {
         BufferLockManager {
             gl,
             buffer_locks: Vec::new(),
-            buffer_target,
         }
     }
 
-    fn check_range_intersect(&mut self, start: i32, length: i32) -> Option<BufferLock> {
+    fn check_range_intersect(&mut self, start: u32, length: u32) -> Option<BufferLock> {
         for (i, bl) in self.buffer_locks.iter().enumerate() {
             if start < (bl.start + bl.length) && bl.start < (start + length) {
                 return Some(self.buffer_locks.remove(i));
@@ -370,14 +444,14 @@ impl<'a> BufferLockManager<'a> {
     }
 
     /// Checks if there is a current fence in progress for this range and, if so, blocks until it completes
-    pub fn wait_for_locked_range(&mut self, start: i32, length: i32) {
+    pub fn wait_for_locked_range(&mut self, start: u32, length: u32) {
         if let Some(bl) = self.check_range_intersect(start, length) {
             self.wait(bl)
         }
     }
 
     /// Adds a fence to GPU command stream
-    pub fn lock_range(&mut self, start: i32, length: i32) {
+    pub fn lock_range(&mut self, start: u32, length: u32) {
         let fence_handle =
             unsafe { self.gl.fence_sync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0) }.unwrap();
 
@@ -419,8 +493,7 @@ impl<'a> BufferLockManager<'a> {
                         trace!(
                             "{}",
                             format!(
-                                "Waiting for '{}' at range: {}-{}",
-                                gl_buffer_target(self.buffer_target),
+                                "Waiting for lock at range: {}-{}",
                                 buffer_lock.start,
                                 buffer_lock.start + buffer_lock.length
                             )
@@ -442,35 +515,31 @@ pub struct BufferStorage<'a> {
     pub handle: gl::Buffer,
     pub buffer_lock_man: BufferLockManager<'a>,
     buffer_base_pointer: *mut u8,
-    buffer_index: i32,
-    section_size_bytes: i32,
-    pub current_section: i32,
-    sections: i32,
+    section_buffer_index: u32, // index into current section, not entire buffer
+    section_size_bytes: u32,
+    pub current_section: u32,
+    sections: u32,
 }
 
 impl<'a> BufferStorage<'a> {
-    pub fn new(gl: &'a gl::Context, gl_target: u32, size_bytes: i32, multiple: i32) -> Self {
+    pub fn new(gl: &'a gl::Context, gl_target: u32, size_bytes: u32, multiple: u32) -> Self {
         let handle: gl::Buffer;
-        let buffer_base_pointer: *mut u8;
         let map_flags = gl::MAP_WRITE_BIT | gl::MAP_PERSISTENT_BIT | gl::MAP_COHERENT_BIT;
         let buffer_flags = map_flags | gl::DYNAMIC_STORAGE_BIT;
 
-        unsafe {
-            handle = gl.create_buffer().unwrap();
-            gl.bind_buffer(gl_target, Some(handle));
-            gl.buffer_storage(gl_target, size_bytes * multiple, None, buffer_flags);
-            buffer_base_pointer =
-                gl.map_buffer_range(gl_target, 0, size_bytes * multiple, map_flags);
-            gl.bind_buffer(gl_target, None);
-        }
+        let buffer_base_pointer = unsafe {
+            handle = gl.create_named_buffer().unwrap();
+            gl.named_buffer_storage(handle, (size_bytes * multiple) as i32, None, buffer_flags);
+            gl.map_named_buffer_range(handle, 0, (size_bytes * multiple) as i32, map_flags)
+        };
 
         BufferStorage {
             gl,
             gl_target,
             handle,
-            buffer_lock_man: BufferLockManager::new(gl, gl_target),
+            buffer_lock_man: BufferLockManager::new(gl),
             buffer_base_pointer,
-            buffer_index: 0,
+            section_buffer_index: 0,
             section_size_bytes: size_bytes,
             current_section: 0,
             sections: multiple,
@@ -482,38 +551,47 @@ impl<'a> BufferStorage<'a> {
         self.current_section = (self.current_section + 1) % self.sections;
     }
 
-    /// As buffer_index is a section-local index, this applies an offset with respect to current section
-    pub fn current_section_buffer_index(&self) -> i32 {
-        self.buffer_index + self.current_section_buffer_offset()
+    /// Address of current_buffer_index()
+    pub fn current_buffer_address(&self) -> u64 {
+        unsafe {
+            self.buffer_base_pointer
+                .add(self.current_buffer_index() as usize) as u64
+        }
     }
 
-    /// Offset with respect to current section
-    pub fn current_section_buffer_offset(&self) -> i32 {
+    /// As section_buffer_index is a section-local index, this applies an offset with respect to current section
+    /// to get an offset into the entire buffer
+    pub fn current_buffer_index(&self) -> u32 {
+        self.section_buffer_index + self.current_section_buffer_offset()
+    }
+
+    /// Offset in entire buffer to the current section
+    pub fn current_section_buffer_offset(&self) -> u32 {
         self.section_size_bytes * self.current_section
     }
 
     /// Reset the section-local buffer index to 0
     pub fn reset_index(&mut self) {
-        self.buffer_index = 0;
+        self.section_buffer_index = 0;
     }
 
     /// Wraps buffer_index if the required size_bytes can not fit contigiously in the buffer and waits for any
     /// fences associated with the range to be met.
-    pub fn reserve(&mut self, size_bytes: i32) {
-        if self.buffer_index + size_bytes > self.section_size_bytes {
-            self.buffer_index = 0;
+    pub fn reserve(&mut self, size_bytes: u32) {
+        if self.section_buffer_index + size_bytes > self.section_size_bytes {
+            self.section_buffer_index = 0;
         }
 
         self.buffer_lock_man
-            .wait_for_locked_range(self.current_section_buffer_index(), size_bytes)
+            .wait_for_locked_range(self.current_buffer_index(), size_bytes)
     }
 
     /// Sets a fence at the current point in the command stream. <br>
     /// The fence is associated with a range from _current_section_buffer_index_ to an offset determined by provided
     /// size_bytes.
-    pub fn set_fence(&mut self, size_bytes: i32) {
+    pub fn set_fence(&mut self, size_bytes: u32) {
         self.buffer_lock_man
-            .lock_range(self.current_section_buffer_index(), size_bytes)
+            .lock_range(self.current_buffer_index(), size_bytes)
     }
 
     pub fn push_data_slice<T: bytemuck::Pod>(&mut self, data: &[T]) {
@@ -523,13 +601,13 @@ impl<'a> BufferStorage<'a> {
             std::ptr::copy_nonoverlapping(
                 data.as_ptr(),
                 self.buffer_base_pointer
-                    .add(self.current_section_buffer_index() as usize),
+                    .add(self.current_buffer_index() as usize),
                 data.len(),
             );
         }
 
         // it is assumed that user previously calls reserve on the range to avoid overflowing buffer
-        self.buffer_index += data.len() as i32;
+        self.section_buffer_index += data.len() as u32;
     }
 
     pub fn push_data<T>(&mut self, data: &T) {
@@ -537,13 +615,13 @@ impl<'a> BufferStorage<'a> {
             std::ptr::copy_nonoverlapping(
                 data as *const T as *const u8,
                 self.buffer_base_pointer
-                    .add(self.current_section_buffer_index() as usize),
+                    .add(self.current_buffer_index() as usize),
                 std::mem::size_of::<T>(),
             );
         }
 
         // it is assumed that user previously calls reserve on the range to avoid overflowing buffer
-        self.buffer_index += std::mem::size_of::<T>() as i32;
+        self.section_buffer_index += std::mem::size_of::<T>() as u32;
     }
 
     pub fn set_data_slice<T: bytemuck::Pod>(&mut self, data: &[T], offset: usize) {

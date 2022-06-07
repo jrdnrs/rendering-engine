@@ -65,8 +65,14 @@ impl<'a> Texture<'a> {
         let data_type = image.data_type;
 
         let handle = unsafe {
-            let handle = gl.create_texture().unwrap();
-            gl.bind_texture(target, Some(handle));
+            let handle = gl.create_named_texture(target).unwrap();
+            gl.texture_storage_2d(
+                handle,
+                image.mipmap_count as i32,
+                internal_format,
+                width as i32,
+                height as i32,
+            );
 
             if image.compressed {
                 // mipmaps are not automatically generated for compressed textures, should be done beforehand
@@ -92,15 +98,18 @@ impl<'a> Texture<'a> {
                         ((level_w as f32 / 4.0).ceil() * (level_h as f32 / 4.0).ceil()) as u32;
                     level_size = level_blocks * 16;
 
-                    gl.compressed_tex_image_2d(
-                        target,
+                    gl.compressed_texture_sub_image_2d(
+                        handle,
                         level as i32,
-                        internal_format as i32,
+                        0,
+                        0,
                         level_w as i32,
                         level_h as i32,
-                        0,
-                        level_size as i32,
-                        &image.bytes[level_offset as usize..(level_offset + level_size) as usize],
+                        internal_format,
+                        gl::CompressedPixelUnpackData::Slice(
+                            &image.bytes
+                                [level_offset as usize..(level_offset + level_size) as usize],
+                        ),
                     );
 
                     level_w /= 2;
@@ -108,27 +117,25 @@ impl<'a> Texture<'a> {
                     level_offset += level_size;
                 }
             } else {
-                gl.tex_image_2d(
-                    target,
+                gl.texture_sub_image_2d(
+                    handle,
                     0,
-                    internal_format as i32,
+                    0,
+                    0,
                     width as i32,
                     height as i32,
-                    0,
-                    format,
+                    internal_format,
                     data_type,
-                    Some(&image.bytes),
+                    gl::PixelUnpackData::Slice(&image.bytes),
                 );
 
-                gl.generate_mipmap(target);
+                gl.generate_texture_mipmap(handle);
             }
 
-            gl.tex_parameter_i32(target, gl::TEXTURE_WRAP_S, config.wrap as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_WRAP_T, config.wrap as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_MIN_FILTER, config.min_filter as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_MAG_FILTER, config.mag_filter as i32);
-
-            gl.bind_texture(target, None);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_WRAP_S, config.wrap as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_WRAP_T, config.wrap as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_MIN_FILTER, config.min_filter as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_MAG_FILTER, config.mag_filter as i32);
 
             handle
         };
@@ -158,8 +165,14 @@ impl<'a> Texture<'a> {
         let data_type = images[0].data_type;
 
         let handle = unsafe {
-            let handle = gl.create_texture().unwrap();
-            gl.bind_texture(target, Some(handle));
+            let handle = gl.create_named_texture(target).unwrap();
+            gl.texture_storage_2d(
+                handle,
+                images[0].mipmap_count as i32,
+                internal_format,
+                width as i32,
+                height as i32,
+            );
 
             // just check the first to see if they are compressed, all should be the same (still should check)
             if images[0].compressed {
@@ -188,16 +201,20 @@ impl<'a> Texture<'a> {
                             ((level_w as f32 / 4.0).ceil() * (level_h as f32 / 4.0).ceil()) as u32;
                         level_size = level_blocks * 16;
 
-                        gl.compressed_tex_image_2d(
-                            gl::TEXTURE_CUBE_MAP_POSITIVE_X + i as u32,
+                        gl.compressed_texture_sub_image_3d(
+                            handle,
                             level as i32,
-                            internal_format as i32,
+                            0,
+                            0,
+                            i as i32,
                             level_w as i32,
                             level_h as i32,
-                            0,
-                            level_size as i32,
-                            &image.bytes
-                                [level_offset as usize..(level_offset + level_size) as usize],
+                            1,
+                            internal_format,
+                            gl::CompressedPixelUnpackData::Slice(
+                                &image.bytes
+                                    [level_offset as usize..(level_offset + level_size) as usize],
+                            ),
                         );
 
                         level_w /= 2;
@@ -207,29 +224,29 @@ impl<'a> Texture<'a> {
                 }
             } else {
                 for (i, image) in images.iter().enumerate() {
-                    gl.tex_image_2d(
-                        gl::TEXTURE_CUBE_MAP_POSITIVE_X + i as u32,
+                    gl.texture_sub_image_3d(
+                        handle,
                         0,
-                        internal_format as i32,
+                        0,
+                        0,
+                        i as i32,
                         width as i32,
                         height as i32,
-                        0,
-                        format,
+                        1,
+                        internal_format,
                         data_type,
-                        Some(&image.bytes),
+                        gl::PixelUnpackData::Slice(&image.bytes),
                     );
                 }
 
-                gl.generate_mipmap(target);
+                gl.generate_texture_mipmap(handle);
             }
 
-            gl.tex_parameter_i32(target, gl::TEXTURE_WRAP_S, config.wrap as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_WRAP_T, config.wrap as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_WRAP_R, config.wrap as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_MIN_FILTER, config.min_filter as i32);
-            gl.tex_parameter_i32(target, gl::TEXTURE_MAG_FILTER, config.mag_filter as i32);
-
-            gl.bind_texture(target, None);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_WRAP_S, config.wrap as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_WRAP_T, config.wrap as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_WRAP_R, config.wrap as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_MIN_FILTER, config.min_filter as i32);
+            gl.texture_parameter_i32(handle, gl::TEXTURE_MAG_FILTER, config.mag_filter as i32);
 
             handle
         };

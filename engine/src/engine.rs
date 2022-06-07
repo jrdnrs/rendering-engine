@@ -5,7 +5,7 @@ use glow::{self as gl, HasContext};
 use glutin::{
     event::{DeviceEvent, Event, MouseButton, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn,
+    platform::run_return::EventLoopExtRunReturn, window::Fullscreen, monitor::VideoMode,
 };
 use log::debug;
 
@@ -97,18 +97,6 @@ impl<'a> Engine<'a> {
                 // debug!("x: {}, y: {}, z: {}", self.camera.direction.x, self.camera.direction.y, self.camera.direction.x)
             }
 
-            if self.input.is_key_down(VirtualKeyCode::F1) {
-                self.context.wireframe = !self.context.wireframe;
-
-                if self.context.wireframe {
-                    unsafe { self.gl.polygon_mode(gl::FRONT_AND_BACK, gl::LINE) }
-                    debug!("Wireframe enabled")
-                } else {
-                    unsafe { self.gl.polygon_mode(gl::FRONT_AND_BACK, gl::FILL) }
-                    debug!("Wireframe disabled")
-                }
-            }
-
             if self.input.is_key_down(VirtualKeyCode::F2) {
                 debug!("Reloading shaders");
                 for p in self
@@ -157,6 +145,7 @@ impl<'a> Engine<'a> {
             if self.input.is_key_down(VirtualKeyCode::LShift) {
                 self.renderer.camera.position -= Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
             }
+
         }
     }
 
@@ -281,6 +270,23 @@ impl<'a> Engine<'a> {
             }
         }
 
+
+        for i in 1..6 {
+            let block = self.world.create_entity();
+            _ = self.world.set_component(&block, components::Block {});
+            _ = self.world.set_component(
+                &block,
+                components::Renderable {
+                    mesh_id: cube_model_id,
+                    material_id: ground_material_id,
+                    shader_id: light_shader_id,
+                    transform: Mat4f::translate(12.0, i as f32 , -8.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE,
+                },
+            );
+        }
+
+
         let lamp = self.world.create_entity();
         _ = self.world.set_component(&lamp, components::LightBlock {});
         _ = self.world.set_component(
@@ -341,7 +347,7 @@ impl<'a> Engine<'a> {
             mesh_id: axis_mesh_id,
             material_id: lamp_material_id,
             shader_id: debug_shader_id,
-            transform: Mat4f::translate(0.0, 0.0, 0.0),
+            transform: Mat4f::identity(),
             pipeline_stages: pipeline_stages::STAGE_DEBUG,
         })
     }

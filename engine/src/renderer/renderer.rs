@@ -46,7 +46,6 @@ impl<'a> Renderer<'a> {
             camera: Camera::new_perspective(70.0, 0.1, 100.0),
         };
         r.init();
-
         r
     }
 
@@ -67,7 +66,7 @@ impl<'a> Renderer<'a> {
             stencil: FramebufferAttachment::None,
             width: crate::WIDTH,
             height: crate::HEIGHT,
-            samples: 8,
+            samples: 4,
         };
 
         let fb_id = self.resources_manager.load_framebuffer(&config, true);

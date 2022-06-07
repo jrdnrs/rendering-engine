@@ -19,7 +19,7 @@ pub struct Context {
 
     pub frames: u64,
 
-    pub wireframe: bool,
+    pub fullscreen: bool,
 }
 
 fn load_opengl(window_context: ContextWrapper<PossiblyCurrent, Window>) -> gl::Context {
@@ -78,7 +78,7 @@ impl Context {
                     being_resized: false,
                     being_moved: false,
                     frames: 0,
-                    wireframe: false,
+                    fullscreen: false,
                 },
                 event_loop,
                 gl,

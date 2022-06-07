@@ -59,6 +59,5 @@ in VS_OUT {
 out vec4 FragColour;
 
 void main() {
-    // FragColour = vec4(0.5, 0.2, 0.8, 1.0);
     FragColour = texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord);
 }

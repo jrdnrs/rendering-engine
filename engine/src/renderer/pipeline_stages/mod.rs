@@ -18,7 +18,8 @@ pub const STAGE_SHADOW: u16 = 0b0001_0000_0000_0000;
 
 pub const STAGE_DEBUG: u16 = 0b0000_0000_0000_0001;
 
-pub const STAGES: &[u16] = &[STAGE_SCENE, STAGE_SKY, STAGE_DEBUG, STAGE_POST_PROCESS];
+/// Pipeline executes stages in this order
+pub const STAGES: &[u16] = &[STAGE_SHADOW, STAGE_SCENE, STAGE_SKY, STAGE_DEBUG, STAGE_POST_PROCESS];
 
 pub trait PipelineStage {
     fn get_target(&self) -> FramebufferID;

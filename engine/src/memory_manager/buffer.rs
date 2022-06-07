@@ -361,7 +361,7 @@ impl<'a> VertexArray<'a> {
 
 
             // BUG: Maybe it's a bug, when using the DSA variant of the code below, use of UNSIGNED_SHORT causes strange 
-            // behaviour where some indices don't show. The non-DSA code works fine with UNSIGNED_SHORT...
+            // behaviour where some indices are incorrect (?). The non-DSA code works fine with UNSIGNED_SHORT...
 
             //     let vbo = self.gl.create_buffer().unwrap();
             //     self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));

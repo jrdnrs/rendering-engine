@@ -19,9 +19,22 @@ pub struct FramebufferConfig {
     pub depth: FramebufferAttachment,
     pub stencil: FramebufferAttachment,
 
-    pub width: i32,
-    pub height: i32,
-    pub samples: i32,
+    pub width: u32,
+    pub height: u32,
+    pub samples: u32,
+}
+
+impl Default for FramebufferConfig {
+    fn default() -> Self {
+        Self {
+            colour: FramebufferAttachment::None,
+            depth: FramebufferAttachment::None,
+            stencil: FramebufferAttachment::None,
+            width: crate::WIDTH,
+            height: crate::HEIGHT,
+            samples: 1,
+        }
+    }
 }
 
 pub struct Framebuffer<'a> {
@@ -46,238 +59,72 @@ impl<'a> Framebuffer<'a> {
     fn new_one_sample(gl: &'a gl::Context, config: &FramebufferConfig) -> Self {
         let config = config.clone();
 
-        let framebuffer = unsafe { gl.create_framebuffer().unwrap() };
-        unsafe {
-            gl.bind_framebuffer(gl::FRAMEBUFFER, Some(framebuffer));
-            // gl.viewport(0, 0, config.width, config.height)
-        }
+        let framebuffer = unsafe { gl.create_named_framebuffer().unwrap() };
 
         let colour_handle = match config.colour {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let colour_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(colour_rbo));
-                    gl.renderbuffer_storage(
-                        gl::RENDERBUFFER,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::COLOR_ATTACHMENT0,
-                        gl::RENDERBUFFER,
-                        Some(colour_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(colour_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let colour_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D, Some(colour_tex));
-                    gl.tex_image_2d(
-                        gl::TEXTURE_2D,
-                        0,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        0,
-                        gl::RGBA,
-                        gl::FLOAT,
-                        None,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MIN_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MAG_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_S,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_T,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::COLOR_ATTACHMENT0,
-                        gl::TEXTURE_2D,
-                        Some(colour_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(colour_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer(
+                gl,
+                framebuffer,
+                gl::COLOR_ATTACHMENT0,
+                internal_format,
+                config.width,
+                config.height,
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+                gl,
+                framebuffer,
+                gl::COLOR_ATTACHMENT0,
+                internal_format,
+                config.width,
+                config.height,
+            ),
             FramebufferAttachment::None => unsafe {
-                gl.draw_buffer(gl::NONE);
-                gl.read_buffer(gl::NONE);
+                gl.named_framebuffer_draw_buffer(framebuffer, gl::NONE);
+                gl.named_framebuffer_read_buffer(framebuffer, gl::NONE);
 
                 FramebufferAttachmentHandle::None
             },
         };
 
         let depth_handle = match config.depth {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let depth_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(depth_rbo));
-                    gl.renderbuffer_storage(
-                        gl::RENDERBUFFER,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::DEPTH_ATTACHMENT,
-                        gl::RENDERBUFFER,
-                        Some(depth_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(depth_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let depth_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D, Some(depth_tex));
-                    gl.tex_image_2d(
-                        gl::TEXTURE_2D,
-                        0,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        0,
-                        gl::RGBA,
-                        gl::UNSIGNED_INT,
-                        None,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MIN_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MAG_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_S,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_T,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::DEPTH_ATTACHMENT,
-                        gl::TEXTURE_2D,
-                        Some(depth_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(depth_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer(
+                gl,
+                framebuffer,
+                gl::DEPTH_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+                gl,
+                framebuffer,
+                gl::DEPTH_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+            ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
 
         let stencil_handle = match config.stencil {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let stencil_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(stencil_rbo));
-                    gl.renderbuffer_storage(
-                        gl::RENDERBUFFER,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::STENCIL_ATTACHMENT,
-                        gl::RENDERBUFFER,
-                        Some(stencil_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(stencil_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let stencil_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D, Some(stencil_tex));
-                    gl.tex_image_2d(
-                        gl::TEXTURE_2D,
-                        0,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        0,
-                        gl::RGBA,
-                        gl::UNSIGNED_INT,
-                        None,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MIN_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_MAG_FILTER,
-                        gl::NEAREST as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_S,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.tex_parameter_i32(
-                        gl::TEXTURE_2D,
-                        gl::TEXTURE_WRAP_T,
-                        gl::CLAMP_TO_EDGE as i32,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::STENCIL_ATTACHMENT,
-                        gl::TEXTURE_2D,
-                        Some(stencil_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(stencil_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer(
+                gl,
+                framebuffer,
+                gl::STENCIL_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+                gl,
+                framebuffer,
+                gl::STENCIL_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+            ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
-
-        unsafe {
-            gl.bind_framebuffer(gl::FRAMEBUFFER, None);
-            gl.bind_renderbuffer(gl::RENDERBUFFER, None);
-            gl.bind_texture(gl::TEXTURE_2D, None);
-        }
 
         Self {
             gl,
@@ -292,172 +139,78 @@ impl<'a> Framebuffer<'a> {
     fn new_multisample(gl: &'a gl::Context, config: &FramebufferConfig) -> Self {
         let config = config.clone();
 
-        let framebuffer = unsafe { gl.create_framebuffer().unwrap() };
-        unsafe {
-            gl.bind_framebuffer(gl::FRAMEBUFFER, Some(framebuffer));
-            // gl.viewport(0, 0, config.width, config.height)
-        }
+        let framebuffer = unsafe { gl.create_named_framebuffer().unwrap() };
 
         let colour_handle = match config.colour {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let colour_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(colour_rbo));
-                    gl.renderbuffer_storage_multisample(
-                        gl::RENDERBUFFER,
-                        config.samples,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::COLOR_ATTACHMENT0,
-                        gl::RENDERBUFFER,
-                        Some(colour_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(colour_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let colour_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D_MULTISAMPLE, Some(colour_tex));
-                    gl.tex_image_2d_multisample(
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        config.samples,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        true,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::COLOR_ATTACHMENT0,
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        Some(colour_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(colour_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
+                gl,
+                framebuffer,
+                gl::COLOR_ATTACHMENT0,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+                gl,
+                framebuffer,
+                gl::COLOR_ATTACHMENT0,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
             FramebufferAttachment::None => unsafe {
-                gl.draw_buffer(gl::NONE);
-                gl.read_buffer(gl::NONE);
+                gl.named_framebuffer_draw_buffer(framebuffer, gl::NONE);
+                gl.named_framebuffer_read_buffer(framebuffer, gl::NONE);
 
                 FramebufferAttachmentHandle::None
             },
         };
 
         let depth_handle = match config.depth {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let depth_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(depth_rbo));
-                    gl.renderbuffer_storage_multisample(
-                        gl::RENDERBUFFER,
-                        config.samples,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::DEPTH_ATTACHMENT,
-                        gl::RENDERBUFFER,
-                        Some(depth_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(depth_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let depth_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D_MULTISAMPLE, Some(depth_tex));
-                    gl.tex_image_2d_multisample(
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        config.samples,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        true,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::DEPTH_ATTACHMENT,
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        Some(depth_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(depth_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
+                gl,
+                framebuffer,
+                gl::DEPTH_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+                gl,
+                framebuffer,
+                gl::DEPTH_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
 
         let stencil_handle = match config.stencil {
-            FramebufferAttachment::Renderbuffer { internal_format } => {
-                let stencil_rbo = unsafe { gl.create_renderbuffer().unwrap() };
-
-                unsafe {
-                    gl.bind_renderbuffer(gl::RENDERBUFFER, Some(stencil_rbo));
-                    gl.renderbuffer_storage_multisample(
-                        gl::RENDERBUFFER,
-                        config.samples,
-                        internal_format as u32,
-                        config.width,
-                        config.height,
-                    );
-                    gl.framebuffer_renderbuffer(
-                        gl::FRAMEBUFFER,
-                        gl::STENCIL_ATTACHMENT,
-                        gl::RENDERBUFFER,
-                        Some(stencil_rbo),
-                    );
-                }
-
-                FramebufferAttachmentHandle::Renderbuffer(stencil_rbo)
-            }
-            FramebufferAttachment::Texture { internal_format } => {
-                let stencil_tex = unsafe { gl.create_texture().unwrap() };
-
-                unsafe {
-                    gl.bind_texture(gl::TEXTURE_2D_MULTISAMPLE, Some(stencil_tex));
-                    gl.tex_image_2d_multisample(
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        config.samples,
-                        internal_format as i32,
-                        config.width,
-                        config.height,
-                        true,
-                    );
-                    gl.framebuffer_texture_2d(
-                        gl::FRAMEBUFFER,
-                        gl::STENCIL_ATTACHMENT,
-                        gl::TEXTURE_2D_MULTISAMPLE,
-                        Some(stencil_tex),
-                        0,
-                    );
-                }
-
-                FramebufferAttachmentHandle::Texture(stencil_tex)
-            }
+            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
+                gl,
+                framebuffer,
+                gl::STENCIL_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
+            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+                gl,
+                framebuffer,
+                gl::STENCIL_ATTACHMENT,
+                internal_format,
+                config.width,
+                config.height,
+                config.samples
+            ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
-
-        unsafe {
-            gl.bind_framebuffer(gl::FRAMEBUFFER, None);
-            gl.bind_renderbuffer(gl::RENDERBUFFER, None);
-            gl.bind_texture(gl::TEXTURE_2D_MULTISAMPLE, None);
-        }
 
         Self {
             gl,
@@ -467,6 +220,97 @@ impl<'a> Framebuffer<'a> {
             stencil_handle,
             config,
         }
+    }
+
+    fn create_renderbuffer(
+        gl: &gl::Context,
+        framebuffer: gl::Framebuffer,
+        attachment_type: u32,
+        internal_format: u32,
+        width: u32,
+        height: u32,
+    ) -> FramebufferAttachmentHandle {
+        let rbo = unsafe { gl.create_named_renderbuffer().unwrap() };
+
+        unsafe {
+            gl.named_renderbuffer_storage(rbo, internal_format, width as i32, height as i32);
+            gl.named_framebuffer_renderbuffer(framebuffer, attachment_type, gl::RENDERBUFFER, rbo);
+        }
+
+        FramebufferAttachmentHandle::Renderbuffer(rbo)
+    }
+
+    fn create_renderbuffer_multisample(
+        gl: &gl::Context,
+        framebuffer: gl::Framebuffer,
+        attachment_type: u32,
+        internal_format: u32,
+        width: u32,
+        height: u32,
+        samples: u32,
+    ) -> FramebufferAttachmentHandle {
+        let rbo = unsafe { gl.create_named_renderbuffer().unwrap() };
+
+        unsafe {
+            gl.named_renderbuffer_storage_multisample(
+                rbo,
+                samples as i32,
+                internal_format,
+                width as i32,
+                height as i32,
+            );
+            gl.named_framebuffer_renderbuffer(framebuffer, attachment_type, gl::RENDERBUFFER, rbo);
+        }
+
+        FramebufferAttachmentHandle::Renderbuffer(rbo)
+    }
+
+    fn create_texture(
+        gl: &gl::Context,
+        framebuffer: gl::Framebuffer,
+        attachment_type: u32,
+        internal_format: u32,
+        width: u32,
+        height: u32,
+    ) -> FramebufferAttachmentHandle {
+        let texture = unsafe { gl.create_named_texture(gl::TEXTURE_2D).unwrap() };
+
+        unsafe {
+            gl.texture_storage_2d(texture, 1, internal_format, width as i32, height as i32);
+            gl.texture_parameter_i32(texture, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            gl.texture_parameter_i32(texture, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+            gl.texture_parameter_i32(texture, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+            gl.texture_parameter_i32(texture, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+            gl.named_framebuffer_texture(framebuffer, attachment_type, texture, 0);
+        }
+
+        FramebufferAttachmentHandle::Texture(texture)
+    }
+
+    fn create_texture_multisample(
+        gl: &gl::Context,
+        framebuffer: gl::Framebuffer,
+        attachment_type: u32,
+        internal_format: u32,
+        width: u32,
+        height: u32,
+        samples: u32,
+    ) -> FramebufferAttachmentHandle {
+        let texture = unsafe { gl.create_named_texture(gl::TEXTURE_2D_MULTISAMPLE).unwrap() };
+
+        unsafe {
+            gl.texture_storage_2d_multisample(
+                texture,
+                samples as i32,
+                internal_format,
+                width as i32,
+                height as i32,
+                true,
+            );
+            gl.named_framebuffer_texture(framebuffer, attachment_type, texture, 0);
+        }
+
+        FramebufferAttachmentHandle::Texture(texture)
     }
 
     pub fn get_colour_texture_handle(&self) -> Option<gl::Texture> {
@@ -485,7 +329,7 @@ impl<'a> Framebuffer<'a> {
         }
     }
 
-    pub fn resize(&mut self, width: i32, height: i32) {
+    pub fn resize(&mut self, width: u32, height: u32) {
         self.config.width = width;
         self.config.height = height;
         let new = Self::new(&self.gl, &self.config);

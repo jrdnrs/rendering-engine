@@ -81,21 +81,17 @@ impl<'a> PipelineStage for PostProcessStage<'a> {
             .unwrap();
 
         unsafe {
-            self.gl
-                .bind_framebuffer(gl::READ_FRAMEBUFFER, Some(read_fbo.handle));
-
-            self.gl
-                .bind_framebuffer(gl::DRAW_FRAMEBUFFER, Some(blit_fbo.handle));
-
-            self.gl.blit_framebuffer(
+            self.gl.blit_named_framebuffer(
+                read_fbo.handle,
+                blit_fbo.handle,
                 0,
                 0,
-                read_fbo.config.width,
-                read_fbo.config.height,
+                read_fbo.config.width as i32,
+                read_fbo.config.height as i32,
                 0,
                 0,
-                blit_fbo.config.width,
-                blit_fbo.config.height,
+                blit_fbo.config.width as i32,
+                blit_fbo.config.height as i32,
                 gl::COLOR_BUFFER_BIT,
                 gl::NEAREST,
             )
@@ -152,8 +148,8 @@ fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_
         gl.multi_draw_elements_indirect_offset(
             gl::TRIANGLES,
             gl::UNSIGNED_INT,
-            (memory_manager.get_indirect_command_index() 
-                - command_count ) as u64 * DRAW_COMMAND_SIZE as u64,
+            ((memory_manager.get_indirect_command_index() 
+                - command_count ) * DRAW_COMMAND_SIZE) as i32,
             command_count as i32,
             0,
         );

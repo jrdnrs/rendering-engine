@@ -44,7 +44,7 @@ impl<'a> RendererPipeline<'a> {
     ) {
         for stage_id in STAGES {
             if let Some(stage) = self.stages.get_mut(stage_id) {
-                renderer_state.set_framebuffer(Some(stage.get_target()), resources_manager);
+                renderer_state.set_framebuffer(Some(&stage.get_target()), resources_manager);
                 stage.execute(memory_manager, resources_manager, renderer_state);
                 renderer_state.set_rasteriser_state(RasteriserState::default());
             }

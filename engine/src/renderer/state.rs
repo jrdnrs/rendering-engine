@@ -250,20 +250,20 @@ impl<'a> RendererState<'a> {
 
     pub fn set_framebuffer(
         &mut self,
-        framebuffer_id: Option<FramebufferID>,
+        framebuffer_id: Option<&FramebufferID>,
         resources_manager: &ResourcesManager,
     ) -> bool {
         if let Some(new_framebuffer_id) = framebuffer_id {
             if let Some(current_framebuffer_id) = self.framebuffer {
-                if current_framebuffer_id == new_framebuffer_id {
+                if current_framebuffer_id == *new_framebuffer_id {
                     return false;
                 }
             }
 
-            self.framebuffer = Some(new_framebuffer_id);
+            self.framebuffer = Some(new_framebuffer_id.clone());
             resources_manager
                 .framebuffer_manager
-                .borrow(&new_framebuffer_id)
+                .borrow(new_framebuffer_id)
                 .unwrap()
                 .bind();
 

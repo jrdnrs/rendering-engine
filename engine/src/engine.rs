@@ -165,7 +165,7 @@ impl<'a> Engine<'a> {
         self.renderer.set_clear_colour(0.4, 0.5, 0.9, 1.0);
         let window_size = self.context.window_context.window().inner_size();
         self.renderer
-            .set_viewport(window_size.width as i32, window_size.height as i32);
+            .set_viewport(window_size.width, window_size.height);
 
         let lamp_texture_id = self
             .renderer
@@ -447,7 +447,7 @@ impl<'a> Engine<'a> {
                         self.context.being_resized = true;
                         self.context.window_context.resize(*physical_size);
                         self.renderer
-                            .set_viewport(physical_size.width as i32, physical_size.height as i32);
+                            .set_viewport(physical_size.width, physical_size.height);
                     }
                     WindowEvent::Moved(_) => {
                         self.context.being_moved = true;

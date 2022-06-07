@@ -18,8 +18,8 @@ use engine::Engine;
 const FPS: f32 = 30.0;
 const VSYNC: bool = true;
 const SAMPLES: u16 = 4;
-const WIDTH: i32 = 1600;
-const HEIGHT: i32 = 900;
+const WIDTH: u32 = 1600;
+const HEIGHT: u32 = 900;
 
 static LOGGER: Logger = Logger;
 

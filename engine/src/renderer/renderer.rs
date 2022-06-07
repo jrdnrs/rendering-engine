@@ -84,7 +84,7 @@ impl<'a> Renderer<'a> {
         );
     }
 
-    pub fn set_viewport(&mut self, width: i32, height: i32) {
+    pub fn set_viewport(&mut self, width: u32, height: u32) {
         self.camera.update_projection(width as f32, height as f32);
 
         for i in 0..self.resources_manager.resize_framebuffers.len() {

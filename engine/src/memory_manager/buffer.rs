@@ -242,7 +242,7 @@ pub struct VertexArray<'a> {
 
 impl<'a> VertexArray<'a> {
     pub fn new(gl: &'a gl::Context, layout: BufferLayout, size: u32, multiple: u32) -> Self {
-        let vao = unsafe { gl.create_vertex_array().unwrap() };
+        let vao = unsafe { gl.create_named_vertex_array().unwrap() };
 
         // TODO: These should definitely not all be the same size...
         let vbo = BufferStorage::new(gl, gl::ARRAY_BUFFER, size, multiple);
@@ -255,10 +255,8 @@ impl<'a> VertexArray<'a> {
             vertex_buffer: vbo,
             index_buffer: ebo,
         };
-        vertex_array.bind();
         vertex_array.attach_vertex_buffers();
         vertex_array.attach_index_buffer();
-        vertex_array.unbind();
 
         vertex_array
     }
@@ -549,14 +547,6 @@ impl<'a> BufferStorage<'a> {
     /// Round-robin to next section, if there are more than one
     pub fn next_section(&mut self) {
         self.current_section = (self.current_section + 1) % self.sections;
-    }
-
-    /// Address of current_buffer_index()
-    pub fn current_buffer_address(&self) -> u64 {
-        unsafe {
-            self.buffer_base_pointer
-                .add(self.current_buffer_index() as usize) as u64
-        }
     }
 
     /// As section_buffer_index is a section-local index, this applies an offset with respect to current section

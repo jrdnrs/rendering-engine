@@ -98,7 +98,7 @@ impl<'a> Renderer<'a> {
         }
 
         unsafe {
-            self.gl.viewport(0, 0, width, height);
+            self.gl.viewport(0, 0, width as i32, height as i32);
         }
     }
 

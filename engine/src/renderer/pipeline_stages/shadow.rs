@@ -132,8 +132,8 @@ fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_
         gl.multi_draw_elements_indirect_offset(
             gl::TRIANGLES,
             gl::UNSIGNED_INT,
-            (memory_manager.get_indirect_command_index() 
-                - command_count ) as u64 * DRAW_COMMAND_SIZE as u64,
+            ((memory_manager.get_indirect_command_index() 
+            - command_count ) * DRAW_COMMAND_SIZE) as i32,
             command_count as i32,
             0,
         );

@@ -176,10 +176,6 @@ impl<'a> MemoryManager<'a> {
         (self.indirect_draw_buffer.current_buffer_index() / DRAW_COMMAND_SIZE) as u32
     }
 
-    pub fn get_indirect_command_address(&mut self) -> u64 {
-        self.indirect_draw_buffer.current_buffer_address()
-    }
-
     pub fn push_vertex_data<T>(&mut self, data: &T) {
         self.vertex_array.vertex_buffer.push_data(data)
     }

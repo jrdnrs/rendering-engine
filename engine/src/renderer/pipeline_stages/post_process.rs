@@ -75,6 +75,11 @@ impl<'a> PipelineStage for PostProcessStage<'a> {
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
     ) {
+        // renderer_state.set_rasteriser_state(RasteriserState {
+        //     culling: false,
+        //     ..Default::default()
+        // });
+
         let read_fbo = resources_manager.borrow_framebuffer(&self.target).unwrap();
         let blit_fbo = resources_manager
             .borrow_framebuffer(&self.blit_buffer)
@@ -148,8 +153,8 @@ fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_
         gl.multi_draw_elements_indirect_offset(
             gl::TRIANGLES,
             gl::UNSIGNED_INT,
-            ((memory_manager.get_indirect_command_index() 
-                - command_count ) * DRAW_COMMAND_SIZE) as i32,
+            ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
+                as i32,
             command_count as i32,
             0,
         );

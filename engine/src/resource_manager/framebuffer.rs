@@ -142,15 +142,17 @@ impl<'a> Framebuffer<'a> {
         let framebuffer = unsafe { gl.create_named_framebuffer().unwrap() };
 
         let colour_handle = match config.colour {
-            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
-                gl,
-                framebuffer,
-                gl::COLOR_ATTACHMENT0,
-                internal_format,
-                config.width,
-                config.height,
-                config.samples
-            ),
+            FramebufferAttachment::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
+                    gl,
+                    framebuffer,
+                    gl::COLOR_ATTACHMENT0,
+                    internal_format,
+                    config.width,
+                    config.height,
+                    config.samples,
+                )
+            }
             FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
                 gl,
                 framebuffer,
@@ -158,7 +160,7 @@ impl<'a> Framebuffer<'a> {
                 internal_format,
                 config.width,
                 config.height,
-                config.samples
+                config.samples,
             ),
             FramebufferAttachment::None => unsafe {
                 gl.named_framebuffer_draw_buffer(framebuffer, gl::NONE);
@@ -169,15 +171,17 @@ impl<'a> Framebuffer<'a> {
         };
 
         let depth_handle = match config.depth {
-            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
-                gl,
-                framebuffer,
-                gl::DEPTH_ATTACHMENT,
-                internal_format,
-                config.width,
-                config.height,
-                config.samples
-            ),
+            FramebufferAttachment::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
+                    gl,
+                    framebuffer,
+                    gl::DEPTH_ATTACHMENT,
+                    internal_format,
+                    config.width,
+                    config.height,
+                    config.samples,
+                )
+            }
             FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
                 gl,
                 framebuffer,
@@ -185,21 +189,23 @@ impl<'a> Framebuffer<'a> {
                 internal_format,
                 config.width,
                 config.height,
-                config.samples
+                config.samples,
             ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
 
         let stencil_handle = match config.stencil {
-            FramebufferAttachment::Renderbuffer { internal_format } => Self::create_renderbuffer_multisample(
-                gl,
-                framebuffer,
-                gl::STENCIL_ATTACHMENT,
-                internal_format,
-                config.width,
-                config.height,
-                config.samples
-            ),
+            FramebufferAttachment::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
+                    gl,
+                    framebuffer,
+                    gl::STENCIL_ATTACHMENT,
+                    internal_format,
+                    config.width,
+                    config.height,
+                    config.samples,
+                )
+            }
             FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
                 gl,
                 framebuffer,
@@ -207,7 +213,7 @@ impl<'a> Framebuffer<'a> {
                 internal_format,
                 config.width,
                 config.height,
-                config.samples
+                config.samples,
             ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
@@ -329,6 +335,22 @@ impl<'a> Framebuffer<'a> {
         }
     }
 
+    pub fn get_depth_texture_handle(&self) -> Option<gl::Texture> {
+        if let FramebufferAttachmentHandle::Texture(handle) = self.depth_handle {
+            Some(handle)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_depth_renderbuffer_handle(&self) -> Option<gl::Renderbuffer> {
+        if let FramebufferAttachmentHandle::Renderbuffer(handle) = self.depth_handle {
+            Some(handle)
+        } else {
+            None
+        }
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         self.config.width = width;
         self.config.height = height;
@@ -338,7 +360,11 @@ impl<'a> Framebuffer<'a> {
     }
 
     pub fn bind(&self) {
-        unsafe { self.gl.bind_framebuffer(gl::FRAMEBUFFER, Some(self.handle)) }
+        unsafe {
+            self.gl.bind_framebuffer(gl::FRAMEBUFFER, Some(self.handle));
+            self.gl
+                .viewport(0, 0, self.config.width as i32, self.config.height as i32);
+        }
     }
 
     pub fn unbind(&self) {

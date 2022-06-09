@@ -5,7 +5,9 @@ layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec4 a_colour;
 layout(location = 3) in vec2 a_texCoord;
-layout(location = 4) in int a_index;
+
+layout(location = 4) in int a_materialIndex;
+layout(location = 5) in mat4 a_transform;
 
 out VS_OUT {
     vec4 colour;
@@ -20,7 +22,7 @@ layout (std430, binding = 3) buffer Matrices {
 void main() {
     vs_out.colour = a_colour;
 
-    mat4 newView = mat4(mat3(view));
+    mat4 newView = mat4(mat3(projection * view));
     gl_Position = newView * vec4(a_position, 1.0);
 }
 

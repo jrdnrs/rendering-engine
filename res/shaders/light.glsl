@@ -1,12 +1,15 @@
 #shader vertex
 #version 460 core
-#include "res/shaders/common/materialDef.glsl"
+#include "res/shaders/common/defs/material.glsl"
+#include "res/shaders/common/defs/light.glsl"
 
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec4 a_colour;
 layout(location = 3) in vec2 a_texCoord;
-layout(location = 4) in int a_index;
+
+layout(location = 4) in int a_materialIndex;
+layout(location = 5) in mat4 a_transform;
 
 out VS_OUT {
     vec3 fragPos; 
@@ -14,6 +17,16 @@ out VS_OUT {
     vec2 texCoord;
     Material material;
 } vs_out;
+
+layout (std430, binding = 0) buffer Lights {
+    Light allLights[32];
+    mat4 lightViews[32];
+    mat4 lightProjection;
+    uvec2 shadowMaps[32];
+    int lightCount;
+    vec3 cameraDir;
+    vec3 cameraPos;
+};
 
 layout (std430, binding = 2) buffer Materials {
     Material materials[100];
@@ -24,26 +37,13 @@ layout (std430, binding = 3) buffer Matrices {
     mat4 view;
 };
 
-struct InstanceData {
-    mat4 transform;
-    uint materialIndex;
-};
-
-layout (std430, binding = 4) buffer InstanceDatas {
-    InstanceData instanceData[1000];
-};
-
 void main() {
-    InstanceData thisInstance = instanceData[a_index];
-
-    mat4 transform = thisInstance.transform;
-
-    vs_out.fragPos = vec3(transform * vec4(a_position, 1.0));
-    vs_out.normal = mat3(transpose(inverse(transform))) * a_normal;
+    vs_out.fragPos = vec3(a_transform * vec4(a_position, 1.0));
+    vs_out.normal = mat3(transpose(inverse(a_transform))) * a_normal;
     vs_out.texCoord = a_texCoord;
-    vs_out.material = materials[thisInstance.materialIndex];
+    vs_out.material = materials[a_materialIndex];
 
-    gl_Position = projection * view * transform * vec4(a_position, 1.0);
+    gl_Position = projection * view * a_transform * vec4(a_position, 1.0);
 }
 
 
@@ -64,6 +64,9 @@ out vec4 FragColour;
 
 layout (std430, binding = 0) buffer Lights {
     Light allLights[32];
+    mat4 lightViews[32];
+    mat4 lightProjection;
+    uvec2 shadowMaps[32];
     int lightCount;
     vec3 cameraDir;
     vec3 cameraPos;

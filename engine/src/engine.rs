@@ -380,9 +380,9 @@ impl<'a> Engine<'a> {
                 linear: 0.14,
                 constant: 1.0,
                 position: Vec3f::new(
-                    renderable.transform.0[3],
-                    renderable.transform.0[7],
-                    renderable.transform.0[11],
+                    renderable.transform[(0, 3)],
+                    renderable.transform[(1, 3)],
+                    renderable.transform[(2, 3)],
                 ),
                 ..Default::default()
             })

@@ -120,7 +120,7 @@ impl<'a> PipelineStage for DebugStage<'a> {
 
                     memory_manager.push_instance_data(&InstanceData {
                         material_index: renderable.material_id.index(),
-                        transform: renderable.transform.transpose(),
+                        transform: renderable.transform,
                     });
                 }
 

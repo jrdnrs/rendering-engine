@@ -366,7 +366,7 @@ impl<'a> Program<'a> {
             ShaderData::Mat3f() => todo!(),
             ShaderData::Mat4f(v) => unsafe {
                 self.gl
-                    .uniform_matrix_4_f32_slice(Some(&loc), true, v.as_slice())
+                    .uniform_matrix_4_f32_slice(Some(&loc), false, v.as_slice())
             },
         }
     }

@@ -62,7 +62,7 @@ impl<'a> PipelineStage for SkyStage<'a> {
 
             let instance = InstanceData {
                 material_index: skybox.material_id.index(),
-                transform: skybox.transform.transpose(),
+                transform: skybox.transform,
             };
 
             let base_instance = memory_manager.get_instance_index();

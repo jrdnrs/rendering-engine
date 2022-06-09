@@ -1,7 +1,4 @@
-use std::collections::{HashMap, HashSet};
-
 use glow::{self as gl, HasContext};
-use nohash_hasher::BuildNoHashHasher;
 
 use super::PipelineStage;
 use crate::{
@@ -25,9 +22,6 @@ pub struct SceneStage<'a> {
     renderables: Vec<Renderable>,
     command_queue: DrawCommands,
     pending_indirect_command_count: u32,
-
-    meshes_per_shader: HashMap<u32, HashSet<u32, BuildNoHashHasher<u32>>, BuildNoHashHasher<u32>>,
-    instances_per_mesh: HashMap<u32, u32, BuildNoHashHasher<u32>>,
 }
 
 impl<'a> SceneStage<'a> {
@@ -38,9 +32,6 @@ impl<'a> SceneStage<'a> {
             renderables: Vec::new(),
             command_queue: DrawCommands::new(hash),
             pending_indirect_command_count: 0,
-
-            meshes_per_shader: HashMap::with_hasher(BuildNoHashHasher::default()),
-            instances_per_mesh: HashMap::with_hasher(BuildNoHashHasher::default()),
         }
     }
 }
@@ -59,24 +50,7 @@ impl<'a> PipelineStage for SceneStage<'a> {
     }
 
     fn submit(&mut self, renderable: &Renderable) {
-        self.renderables.push(renderable.clone());
-
-        if let Some(mesh_set) = self
-            .meshes_per_shader
-            .get_mut(&renderable.shader_id.index())
-        {
-            mesh_set.insert(renderable.mesh_id.index());
-        } else {
-            self.meshes_per_shader
-                .insert(renderable.shader_id.index(), HashSet::with_hasher(BuildNoHashHasher::default()));
-        }
-
-        let renderable_hash = hash(renderable);
-        if let Some(count) = self.instances_per_mesh.get_mut(&renderable_hash) {
-            *count += 1;
-        } else {
-            self.instances_per_mesh.insert(renderable_hash, 1);
-        }
+        self.renderables.push(renderable.clone())
     }
 
     fn execute(
@@ -93,45 +67,64 @@ impl<'a> PipelineStage for SceneStage<'a> {
         self.command_queue.update_keys(&self.renderables);
         self.command_queue.sort_indices();
 
-        let mut index_index = 0;
+        // HACK: added a dummy renderable to the end to otherwise the last renderable would be cut off
+        // when iterating through renderables with renderable and next_renderable. zip stops when one returns None
+        self.renderables.push(Renderable {
+            mesh_id: MeshID::new(0xFFFF),
+            material_id: MaterialID::new(0xFFFF),
+            shader_id: ShaderProgramID::new(0xFFFF),
+            transform: Mat4f::identity(),
+            pipeline_stages: 0,
+        });
+        self.command_queue.indices.push(self.renderables.len() - 1);
 
-        while index_index < self.command_queue.indices.len() {
-            let renderable_index = self.command_queue.indices[index_index];
-            let renderable = &self.renderables[renderable_index];
+        let mut instance_count = 0;
 
-            renderer_state.set_shader_program(renderable.shader_id, resources_manager);
+        for (i, (index, next_index)) in self
+            .command_queue
+            .indices
+            .iter()
+            .zip(self.command_queue.indices[1..].iter())
+            .enumerate()
+        {
+            let renderable = &self.renderables[*index];
+            let next_renderable = &self.renderables[*next_index];
 
-            for _ in 0..self.meshes_per_shader[&renderable.shader_id.index()].len() {
-                let renderable_index = self.command_queue.indices[index_index];
-                let renderable = &self.renderables[renderable_index];
-                let instances = self.instances_per_mesh[&hash(renderable)];
+            instance_count += 1;
 
-                memory_manager.reserve_instance_space(instances);
-                upload_draw_data(memory_manager, resources_manager, renderable, instances);
+            if renderable.shader_id != next_renderable.shader_id
+                || renderable.mesh_id != next_renderable.mesh_id
+            {
+                memory_manager.reserve_instance_space(instance_count);
+                upload_draw_data(
+                    memory_manager,
+                    resources_manager,
+                    renderable,
+                    instance_count,
+                );
                 self.pending_indirect_command_count += 1;
 
-                for _ in 0..instances {
-                    let renderable_index = self.command_queue.indices[index_index];
-                    let renderable = &self.renderables[renderable_index];
+                for instance_index in
+                    self.command_queue.indices[(i - (instance_count - 1) as usize)..(i + 1)].iter()
+                {
+                    let renderable = &self.renderables[*instance_index];
 
                     memory_manager.push_instance_data(&InstanceData {
                         material_index: renderable.material_id.index(),
                         transform: renderable.transform.transpose(),
                     });
-
-                    index_index += 1;
                 }
-            }
 
-            make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+                instance_count = 0;
+            }
+            if renderable.shader_id != next_renderable.shader_id {
+                renderer_state.set_shader_program(renderable.shader_id, resources_manager);
+                make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+                self.pending_indirect_command_count = 0;
+            }
         }
 
         self.renderables.clear();
-        for mesh_set in self.meshes_per_shader.values_mut() {
-            mesh_set.clear();
-        }
-        self.instances_per_mesh.clear();
-        self.pending_indirect_command_count = 0;
     }
 }
 

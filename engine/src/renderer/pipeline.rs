@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use glow::{self as gl, HasContext};
+use nohash_hasher::BuildNoHashHasher;
 
 use super::{
     pipeline_stages::*,
@@ -13,14 +14,14 @@ use crate::{
 
 pub struct RendererPipeline<'a> {
     gl: &'a gl::Context,
-    stages: HashMap<u16, Box<dyn PipelineStage + 'a>>,
+    stages: HashMap<u16, Box<dyn PipelineStage + 'a>, BuildNoHashHasher<u16>>,
 }
 
 impl<'a> RendererPipeline<'a> {
     pub fn new(gl: &'a gl::Context) -> Self {
         Self {
             gl,
-            stages: HashMap::new(),
+            stages: HashMap::with_hasher(BuildNoHashHasher::default()),
         }
     }
 

@@ -50,6 +50,7 @@ impl<'a> PipelineStage for SkyStage<'a> {
         if let Some(skybox) = &self.skybox {
             renderer_state.set_rasteriser_state(RasteriserState {
                 depth_func: gl::LEQUAL,
+                cull_face: gl::FRONT,
                 ..Default::default()
             });
 

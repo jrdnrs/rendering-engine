@@ -139,8 +139,8 @@ impl<'a> RendererState<'a> {
     }
 
     pub fn upload_camera_data(&self, memory_manager: &mut MemoryManager) {
-        memory_manager.set_projection_matrix(self.projection_transform.transpose());
-        memory_manager.set_view_matrix(self.view_transform.transpose());
+        memory_manager.set_projection_matrix(self.projection_transform);
+        memory_manager.set_view_matrix(self.view_transform);
         memory_manager.set_camera_direction(self.camera_direction);
         memory_manager.set_camera_position(self.camera_position);
     }

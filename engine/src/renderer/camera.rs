@@ -92,23 +92,21 @@ impl Camera {
             .normalise()
             .as_tuple();
 
-        Mat4f([
-            lx,
-            ly,
-            lz,
-            -lx * px - ly * py - lz * pz,
-            ux,
-            uy,
-            uz,
-            -ux * px - uy * py - uz * pz,
-            dx,
-            dy,
-            dz,
-            -dx * px - dy * py - dz * pz,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-        ])
+        let mut matrix = Mat4f::identity();
+
+        matrix[(0, 0)] = lx;
+        matrix[(0, 1)] = ly;
+        matrix[(0, 2)] = lz;
+        matrix[(0, 3)] = -lx * px - ly * py - lz * pz;
+        matrix[(1, 0)] = ux;
+        matrix[(1, 1)] = uy;
+        matrix[(1, 2)] = uz;
+        matrix[(1, 3)] = -ux * px - uy * py - uz * pz;
+        matrix[(2, 0)] = dx;
+        matrix[(2, 1)] = dy;
+        matrix[(2, 2)] = dz;
+        matrix[(2, 3)] = -dx * px - dy * py - dz * pz;
+
+        matrix
     }
 }

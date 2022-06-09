@@ -111,7 +111,7 @@ impl<'a> PipelineStage for SceneStage<'a> {
 
                     memory_manager.push_instance_data(&InstanceData {
                         material_index: renderable.material_id.index(),
-                        transform: renderable.transform.transpose(),
+                        transform: renderable.transform,
                     });
                 }
 

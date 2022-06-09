@@ -129,6 +129,12 @@ impl<'a> RendererState<'a> {
 
         unsafe { self.gl.cull_face(self.rasteriser_state.cull_face) }
 
+        if self.rasteriser_state.culling {
+            unsafe { self.gl.enable(gl::CULL_FACE) }
+        } else {
+            unsafe { self.gl.disable(gl::CULL_FACE) }
+        }
+
         unsafe { self.gl.front_face(self.rasteriser_state.front_face) }
     }
 
@@ -219,6 +225,15 @@ impl<'a> RendererState<'a> {
         if state.cull_face != self.rasteriser_state.cull_face {
             self.rasteriser_state.cull_face = state.cull_face;
             unsafe { self.gl.cull_face(self.rasteriser_state.cull_face) }
+        }
+
+        if state.culling != self.rasteriser_state.culling {
+            self.rasteriser_state.culling = state.culling;
+            if self.rasteriser_state.culling {
+                unsafe { self.gl.enable(gl::CULL_FACE) }
+            } else {
+                unsafe { self.gl.disable(gl::CULL_FACE) }
+            }
         }
 
         if state.front_face != self.rasteriser_state.front_face {

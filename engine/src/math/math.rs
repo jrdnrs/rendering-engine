@@ -330,9 +330,9 @@ impl Mat4f {
     }
 
     pub fn orthographic(aspect_ratio: f32, size: f32, near: f32, far: f32) -> Self {
-        let a = aspect_ratio;
+        // let a = aspect_ratio;
         let w = size;
-        let h = w / a;
+        let h = w ;
 
         let r = w / 2.0;
         let l = -r;
@@ -595,6 +595,9 @@ impl std::ops::Mul for Mat4f {
         c
     }
 }
+
+unsafe impl bytemuck::Pod for Mat4f {}
+unsafe impl bytemuck::Zeroable for Mat4f {}
 
 mod tests {
     #![allow(unused_imports)]

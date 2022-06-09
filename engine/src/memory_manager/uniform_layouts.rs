@@ -14,6 +14,9 @@ pub struct ShaderStorageBuffers {
 #[derive(Clone, Copy)]
 pub struct LightsStorageBuffer {
     pub all_lights: [Light; 32],
+    pub light_views: [Mat4f; 32],
+    pub light_projection: Mat4f,
+    pub shadow_maps: [Vec2u; 32],
     pub light_count: u32,
     pub _1: Padding,
     pub _2: Padding,
@@ -58,7 +61,6 @@ pub struct Light {
     pub _4: Padding,
     pub direction: Vec3f,
     pub _5: Padding,
- 
 }
 
 unsafe impl bytemuck::Pod for Light {}

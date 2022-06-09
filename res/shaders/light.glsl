@@ -16,6 +16,7 @@ out VS_OUT {
     vec3 normal;
     vec2 texCoord;
     Material material;
+    vec3 fragPosLightSpace;
 } vs_out;
 
 layout (std430, binding = 0) buffer Lights {
@@ -43,6 +44,8 @@ void main() {
     vs_out.texCoord = a_texCoord;
     vs_out.material = materials[a_materialIndex];
 
+    vec4 fragPosLightSpace = lightProjection * lightViews[0] * vec4(vs_out.fragPos, 1.0);
+    vs_out.fragPosLightSpace = fragPosLightSpace.xyz / fragPosLightSpace.w;
     gl_Position = projection * view * a_transform * vec4(a_position, 1.0);
 }
 
@@ -58,6 +61,7 @@ in VS_OUT {
     vec3 normal;
     vec2 texCoord;
     Material material;
+    vec3 fragPosLightSpace;
 } vs_in;
 
 out vec4 FragColour;
@@ -72,14 +76,44 @@ layout (std430, binding = 0) buffer Lights {
     vec3 cameraPos;
 };
 
+
+float ShadowCalculation(vec3 fragPosLightSpace, vec3 lightDir, vec3 normal)
+{
+
+    sampler2D shadowMap = sampler2D(shadowMaps[0]);
+
+    // transform to [0,1] range
+    vec3 projCoords = clamp(fragPosLightSpace * 0.5 + 0.5, 0.0, 1.0);
+    float currentDepth = projCoords.z;
+    
+    float bias = 0.001;  
+    // float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);  
+
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+    // radius to sample around centre pixel
+    int radius = 1;
+    for (int x = -radius; x <= radius; x++)  {
+        for (int y = -radius; y <= radius; y++)  {
+            float closestDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            shadow += currentDepth > closestDepth ? 1.0 : 0.0;  
+        }
+    }
+    shadow /= pow((radius * 2 + 1), 2);
+
+    return shadow;
+}  
+
 void main() {
     vec3 myColour = vec3(texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord));
     vec3 totalLight = vec3(0.0);
 
     for (int i = 0; i < lightCount; i++) {
+        float shadow = 1.0 - ShadowCalculation(vs_in.fragPosLightSpace, allLights[i].direction, vs_in.normal);
         float lightAttenuation = calcLightAttenutation(allLights[i], vs_in.fragPos);
-        vec3 diffuseLight = myColour * calcDiffuseLight(allLights[i], vs_in.fragPos, vs_in.normal);
         vec3 ambientLight = myColour * calcAmbientLight(allLights[i]);
+        vec3 diffuseLight = myColour * calcDiffuseLight(allLights[i], vs_in.fragPos, vs_in.normal);
         vec3 specularLight = vec3(0.0); 
 
         vec3 lightDir = normalize(allLights[i].position - vs_in.fragPos);
@@ -94,7 +128,7 @@ void main() {
             specularLight = myColour * calcBlinnSpecularLight(allLights[i], vs_in.material, vs_in.fragPos, vs_in.normal, cameraPos);
         }
 
-        totalLight += lightAttenuation * (ambientLight + diffuseLight + specularLight);
+        totalLight += lightAttenuation * (ambientLight + (diffuseLight * shadow) + (specularLight * shadow));
     }
     
     FragColour = vec4(totalLight, 1.0);

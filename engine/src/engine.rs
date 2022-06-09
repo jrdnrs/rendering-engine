@@ -5,7 +5,9 @@ use glow::{self as gl, HasContext};
 use glutin::{
     event::{DeviceEvent, Event, MouseButton, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn, window::Fullscreen, monitor::VideoMode,
+    monitor::VideoMode,
+    platform::run_return::EventLoopExtRunReturn,
+    window::Fullscreen,
 };
 use log::debug;
 
@@ -16,7 +18,11 @@ use crate::{
     math::math::*,
     memory_manager::uniform_layouts::Light,
     renderer::{pipeline_stages, renderer::Renderer},
-    resource_manager::{model::Material, prefabs::{unit_cube_mesh, self}, texture::TextureConfig},
+    resource_manager::{
+        model::Material,
+        prefabs::{self, unit_cube_mesh},
+        texture::TextureConfig,
+    },
 };
 
 pub struct Engine<'a> {
@@ -94,7 +100,12 @@ impl<'a> Engine<'a> {
                 )
                 .normalise();
 
-                // debug!("x: {}, y: {}, z: {}", self.camera.direction.x, self.camera.direction.y, self.camera.direction.x)
+                // debug!(
+                //     "x: {}, y: {}, z: {}",
+                //     self.renderer.camera.direction.x,
+                //     self.renderer.camera.direction.y,
+                //     self.renderer.camera.direction.z
+                // )
             }
 
             if self.input.is_key_down(VirtualKeyCode::F2) {
@@ -145,7 +156,6 @@ impl<'a> Engine<'a> {
             if self.input.is_key_down(VirtualKeyCode::LShift) {
                 self.renderer.camera.position -= Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
             }
-
         }
     }
 
@@ -179,7 +189,6 @@ impl<'a> Engine<'a> {
             )
             .unwrap();
 
-        let debug_shader_id = self.renderer.load_shader("res/shaders/debug.glsl");
         let basic_shader_id = self.renderer.load_shader("res/shaders/basic.glsl");
         let light_shader_id = self.renderer.load_shader("res/shaders/light.glsl");
         let skybox_shader_id = self.renderer.load_shader("res/shaders/skybox.glsl");
@@ -262,14 +271,13 @@ impl<'a> Engine<'a> {
                         material_id: ground_material_id,
                         shader_id: light_shader_id,
                         transform: Mat4f::translate(position.x, position.y, position.z),
-                        pipeline_stages: pipeline_stages::STAGE_SCENE,
+                        pipeline_stages: pipeline_stages::STAGE_SCENE ,
                     },
                 );
 
                 // }
             }
         }
-
 
         for i in 1..6 {
             let block = self.world.create_entity();
@@ -280,12 +288,11 @@ impl<'a> Engine<'a> {
                     mesh_id: cube_model_id,
                     material_id: ground_material_id,
                     shader_id: light_shader_id,
-                    transform: Mat4f::translate(12.0, i as f32 , -8.0),
-                    pipeline_stages: pipeline_stages::STAGE_SCENE,
+                    transform: Mat4f::translate(12.0, i as f32, -8.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE| pipeline_stages::STAGE_SHADOW,
                 },
             );
         }
-
 
         let lamp = self.world.create_entity();
         _ = self.world.set_component(&lamp, components::LightBlock {});
@@ -300,56 +307,59 @@ impl<'a> Engine<'a> {
             },
         );
 
-        let lamp = self.world.create_entity();
-        _ = self.world.set_component(&lamp, components::LightBlock {});
-        _ = self.world.set_component(
-            &lamp,
-            components::Renderable {
-                mesh_id: cube_model_id,
-                material_id: lamp_material_id,
-                shader_id: basic_shader_id,
-                transform: Mat4f::translate(4.0, 4.0, -16.0),
-                pipeline_stages: pipeline_stages::STAGE_SCENE,
-            },
-        );
+        // let lamp = self.world.create_entity();
+        // _ = self.world.set_component(&lamp, components::LightBlock {});
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::Renderable {
+        //         mesh_id: cube_model_id,
+        //         material_id: lamp_material_id,
+        //         shader_id: basic_shader_id,
+        //         transform: Mat4f::translate(4.0, 4.0, -16.0),
+        //         pipeline_stages: pipeline_stages::STAGE_SCENE,
+        //     },
+        // );
 
-        let lamp = self.world.create_entity();
-        _ = self.world.set_component(&lamp, components::LightBlock {});
-        _ = self.world.set_component(
-            &lamp,
-            components::Renderable {
-                mesh_id: cube_model_id,
-                material_id: lamp_material_id,
-                shader_id: basic_shader_id,
-                transform: Mat4f::translate(20.0, 4.0, 0.0),
-                pipeline_stages: pipeline_stages::STAGE_SCENE,
-            },
-        );
+        // let lamp = self.world.create_entity();
+        // _ = self.world.set_component(&lamp, components::LightBlock {});
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::Renderable {
+        //         mesh_id: cube_model_id,
+        //         material_id: lamp_material_id,
+        //         shader_id: basic_shader_id,
+        //         transform: Mat4f::translate(20.0, 4.0, 0.0),
+        //         pipeline_stages: pipeline_stages::STAGE_SCENE,
+        //     },
+        // );
 
-        let lamp = self.world.create_entity();
-        _ = self.world.set_component(&lamp, components::LightBlock {});
-        _ = self.world.set_component(
-            &lamp,
-            components::Renderable {
-                mesh_id: cube_model_id,
-                material_id: lamp_material_id,
-                shader_id: basic_shader_id,
-                transform: Mat4f::translate(4.0, 4.0, 0.0),
-                pipeline_stages: pipeline_stages::STAGE_SCENE,
-            },
-        );
+        // let lamp = self.world.create_entity();
+        // _ = self.world.set_component(&lamp, components::LightBlock {});
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::Renderable {
+        //         mesh_id: cube_model_id,
+        //         material_id: lamp_material_id,
+        //         shader_id: basic_shader_id,
+        //         transform: Mat4f::translate(4.0, 4.0, 0.0),
+        //         pipeline_stages: pipeline_stages::STAGE_SCENE ,
+        //     },
+        // );
 
         let axis_mesh = prefabs::axis();
         let axis_mesh_id = self.renderer.load_mesh(axis_mesh);
 
         let axis = self.world.create_entity();
-        _ = self.world.set_component(&axis, components::Renderable{
-            mesh_id: axis_mesh_id,
-            material_id: lamp_material_id,
-            shader_id: debug_shader_id,
-            transform: Mat4f::identity(),
-            pipeline_stages: pipeline_stages::STAGE_DEBUG,
-        })
+        _ = self.world.set_component(
+            &axis,
+            components::Renderable {
+                mesh_id: axis_mesh_id,
+                material_id: lamp_material_id,
+                shader_id: basic_shader_id,
+                transform: Mat4f::translate(-0.5, -0.5, 0.0),
+                pipeline_stages: pipeline_stages::STAGE_DEBUG,
+            },
+        )
     }
 
     /// This runs once per frame
@@ -376,14 +386,15 @@ impl<'a> Engine<'a> {
                 diffuse_strength: 1.5,
                 specular_col: Vec3f::new(0.5, 0.5, 0.5),
                 specular_strength: 0.5,
-                quadratic: 0.07,
-                linear: 0.14,
+                quadratic: 0.00075,
+                linear: 0.0045,
                 constant: 1.0,
                 position: Vec3f::new(
                     renderable.transform.0[3],
                     renderable.transform.0[7],
                     renderable.transform.0[11],
                 ),
+                direction: Vec3f::new(0.69, 0.23, -0.69),
                 ..Default::default()
             })
         }

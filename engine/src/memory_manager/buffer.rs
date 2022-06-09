@@ -44,10 +44,12 @@ impl BufferElement {
 pub struct BufferLayout {
     pub elements: Vec<BufferElement>,
     pub stride: i32,
+    pub buffer_size: u32,
+    pub divisor: u32,
 }
 
 impl BufferLayout {
-    pub fn new(mut elements: Vec<BufferElement>) -> Self {
+    pub fn new(mut elements: Vec<BufferElement>, buffer_size: u32, divisor: u32) -> Self {
         let mut offset = 0;
         for element in elements.iter_mut() {
             element.offset = offset;
@@ -57,6 +59,8 @@ impl BufferLayout {
         BufferLayout {
             elements,
             stride: offset,
+            buffer_size,
+            divisor,
         }
     }
 }
@@ -235,24 +239,32 @@ impl BufferLayout {
 pub struct VertexArray<'a> {
     pub gl: &'a gl::Context,
     pub handle: gl::VertexArray,
-    pub layout: BufferLayout,
-    pub vertex_buffer: BufferStorage<'a>,
+    pub vertex_layouts: Vec<BufferLayout>,
+    pub vertex_buffers: Vec<BufferStorage<'a>>,
     pub index_buffer: BufferStorage<'a>,
 }
 
 impl<'a> VertexArray<'a> {
-    pub fn new(gl: &'a gl::Context, layout: BufferLayout, size: u32, multiple: u32) -> Self {
+    pub fn new(gl: &'a gl::Context, layouts: Vec<BufferLayout>, ebo_size: u32, multiple: u32) -> Self {
         let vao = unsafe { gl.create_named_vertex_array().unwrap() };
 
-        // TODO: These should definitely not all be the same size...
-        let vbo = BufferStorage::new(gl, gl::ARRAY_BUFFER, size, multiple);
-        let ebo = BufferStorage::new(gl, gl::ELEMENT_ARRAY_BUFFER, size, multiple);
+        let mut vbos = Vec::new();
+        let ebo = BufferStorage::new(gl, gl::ELEMENT_ARRAY_BUFFER, ebo_size, multiple);
+
+        for layout in layouts.iter() {
+            vbos.push(BufferStorage::new(
+                gl,
+                gl::ARRAY_BUFFER,
+                layout.buffer_size,
+                multiple,
+            ))
+        }
 
         let vertex_array = VertexArray {
             gl,
             handle: vao,
-            layout,
-            vertex_buffer: vbo,
+            vertex_layouts: layouts,
+            vertex_buffers: vbos,
             index_buffer: ebo,
         };
         vertex_array.attach_vertex_buffers();
@@ -261,139 +273,67 @@ impl<'a> VertexArray<'a> {
         vertex_array
     }
 
-    // pub fn element_count(&self) -> i32 {
-    //     (self.index_buffer.buffer_index / 4) as i32
-    // }
-
-    // pub fn push_data<T: bytemuck::Pod>(&mut self, data: &[T], indices: &[T]) {
-    //     let data_byte: &[u8] = bytemuck::cast_slice(data);
-    //     let indices_byte: &[u8] = bytemuck::cast_slice(indices);
-
-    //     self.vertex_buffer.push_data(data_byte);
-    //     self.index_buffer.push_data(indices_byte);
-    // }
-
-    // /// updates indices by applying offset
-    // pub fn update_index_push_data<T>(&mut self, data: &[T], indices: &[T], offset: T)
-    // where
-    //     T: bytemuck::Pod + std::ops::AddAssign,
-    // {
-    //     self.vertex_buffer.push_data(data);
-    //     self.index_buffer.update_and_push_data(indices, offset);
-    // }
-
-    // self.bind();
-    // self.vertex_buffer.bind();
-
-    // for (i, element) in self.layout.elements.iter().enumerate() {
-    //     unsafe {
-    //         self.gl.vertex_attrib_pointer_f32(
-    //             i as u32,
-    //             element.count,
-    //             shader_data_gl_type(&element.type_),
-    //             false,
-    //             self.layout.stride,
-    //             element.offset,
-    //         );
-    //         self.gl.enable_vertex_attrib_array(i as u32);
-    //     }
-    // }
-
-    // unsafe {
-    //     const INDEX_LIMIT: usize = 1_000;
-
-    //     let mut indices: [u16; INDEX_LIMIT] = [0; INDEX_LIMIT];
-    //     for i in 0..INDEX_LIMIT {
-    //         indices[i] = i as u16;
-    //     }
-
-    //     let data: &[u8] = bytemuck::cast_slice(&indices);
-
-    //     let vbo = self.gl.create_buffer().unwrap();
-    //     self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));
-    //     self.gl
-    //         .buffer_data_u8_slice(gl::ARRAY_BUFFER, data, gl::STATIC_DRAW);
-
-    //     let attr_index = self.layout.elements.len() as u32;
-    //     self.gl
-    //         .vertex_attrib_pointer_i32(attr_index, 1, gl::UNSIGNED_SHORT, 2, 0);
-    //     self.gl.vertex_attrib_divisor(attr_index, 1);
-    //     self.gl.enable_vertex_attrib_array(attr_index);
-    // }
-
     fn attach_vertex_buffers(&self) {
-        unsafe {
-            self.gl.vertex_array_vertex_buffer(
-                self.handle,
-                0,
-                Some(self.vertex_buffer.handle),
-                0,
-                self.layout.stride,
-            )
-        }
+        let mut attr_index = 0;
 
-        for (i, element) in self.layout.elements.iter().enumerate() {
+        for (buffer_index, (layout, buffer)) in self
+            .vertex_layouts
+            .iter()
+            .zip(self.vertex_buffers.iter())
+            .enumerate()
+        {
             unsafe {
-                self.gl.vertex_array_attrib_format_f32(
+                self.gl.vertex_array_vertex_buffer(
                     self.handle,
-                    i as u32,
-                    element.count,
-                    shader_data_gl_type(&element.type_),
-                    false,
-                    element.offset as u32,
-                );
-                self.gl
-                    .vertex_array_attrib_binding_f32(self.handle, i as u32, 0);
-                self.gl.enable_vertex_array_attrib(self.handle, i as u32);
-            }
-        }
-
-        unsafe {
-            const INDEX_LIMIT: usize = 1_000;
-
-            let mut indices: [u32; INDEX_LIMIT] = [0; INDEX_LIMIT];
-            for i in 0..INDEX_LIMIT {
-                indices[i] = i as u32;
+                    buffer_index as u32,
+                    Some(buffer.handle),
+                    0,
+                    layout.stride,
+                )
             }
 
-            let data: &[u8] = bytemuck::cast_slice(&indices);
+            for element in layout.elements.iter() {
+                let gl_data_type = shader_data_gl_type(&element.type_);
 
+                unsafe {
+                    if gl_data_type == gl::FLOAT {
+                        self.gl.vertex_array_attrib_format_f32(
+                            self.handle,
+                            attr_index as u32,
+                            element.count,
+                            gl_data_type,
+                            false,
+                            element.offset as u32,
+                        );
+                    } else {
+                        self.gl.vertex_array_attrib_format_i32(
+                            self.handle,
+                            attr_index as u32,
+                            element.count,
+                            gl_data_type,
+                            element.offset as u32,
+                        );
+                    }
 
+                    self.gl.vertex_array_attrib_binding_f32(
+                        self.handle,
+                        attr_index as u32,
+                        buffer_index as u32,
+                    );
+                    self.gl
+                        .enable_vertex_array_attrib(self.handle, attr_index as u32);
 
-            // BUG: Maybe it's a bug, when using the DSA variant of the code below, use of UNSIGNED_SHORT causes strange 
-            // behaviour where some indices are incorrect (?). The non-DSA code works fine with UNSIGNED_SHORT...
+                    if layout.divisor > 0 {
+                        self.gl.vertex_array_binding_divisor(
+                            self.handle,
+                            buffer_index as u32,
+                            layout.divisor,
+                        );
+                    }
+                }
 
-            //     let vbo = self.gl.create_buffer().unwrap();
-            //     self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo));
-            //     self.gl
-            //         .buffer_data_u8_slice(gl::ARRAY_BUFFER, data, gl::STATIC_DRAW);
-
-            //     let attr_index = self.layout.elements.len() as u32;
-            //     self.gl
-            //         .vertex_attrib_pointer_i32(attr_index, 1, gl::UNSIGNED_SHORT, 2, 0);
-            //     self.gl.vertex_attrib_divisor(attr_index, 1);
-            //     self.gl.enable_vertex_attrib_array(attr_index);
-
-            let mut vbo =
-                BufferStorage::new(self.gl, gl::ARRAY_BUFFER, data.len() as u32, 1);
-            vbo.push_data_slice(data);
-            self.gl
-                .vertex_array_vertex_buffer(self.handle, 1, Some(vbo.handle), 0, 4);
-
-            let attr_index = self.layout.elements.len() as u32;
-            self.gl.vertex_array_attrib_format_i32(
-                self.handle,
-                attr_index,
-                1,
-                gl::UNSIGNED_INT,
-                0,
-            );
-            self.gl
-                .vertex_array_attrib_binding_f32(self.handle, attr_index, 1);
-            self.gl.enable_vertex_array_attrib(self.handle, attr_index);
-
-            self.gl.bind_buffer(gl::ARRAY_BUFFER, Some(vbo.handle));
-            self.gl.vertex_array_binding_divisor(self.handle, 1, 1);
+                attr_index += 1;
+            }
         }
     }
 

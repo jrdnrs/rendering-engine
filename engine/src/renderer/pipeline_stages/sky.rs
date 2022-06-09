@@ -1,16 +1,14 @@
 use glow::{self as gl, HasContext};
 
+use super::PipelineStage;
 use crate::{
     components::Renderable,
-    memory_manager::{
-        memory_manager::{DrawElementsIndirectCommand, MemoryManager, DRAW_COMMAND_SIZE},
-        uniform_layouts::InstanceData,
+    memory_manager::memory_manager::{
+        DrawElementsIndirectCommand, InstanceData, MemoryManager, DRAW_COMMAND_SIZE,
     },
     renderer::state::{RasteriserState, RendererState},
-    resource_manager::resource_manager::{ResourceIDTrait, ResourcesManager, FramebufferID},
+    resource_manager::resource_manager::{FramebufferID, ResourceIDTrait, ResourcesManager},
 };
-
-use super::PipelineStage;
 
 pub struct SkyStage<'a> {
     gl: &'a gl::Context,
@@ -20,7 +18,11 @@ pub struct SkyStage<'a> {
 
 impl<'a> SkyStage<'a> {
     pub fn new(gl: &'a gl::Context, target: FramebufferID) -> Self {
-        Self { gl, target, skybox: None,  }
+        Self {
+            gl,
+            target,
+            skybox: None,
+        }
     }
 }
 
@@ -28,7 +30,7 @@ impl<'a> PipelineStage for SkyStage<'a> {
     fn get_target(&self) -> FramebufferID {
         self.target
     }
-    
+
     fn init(
         &mut self,
         memory_manager: &mut MemoryManager,
@@ -56,16 +58,17 @@ impl<'a> PipelineStage for SkyStage<'a> {
 
             renderer_state.set_shader_program(skybox.shader_id, resources_manager);
 
-            let instance = InstanceData {
-                transform: skybox.transform.clone(),
-                material_index: skybox.material_id.index(),
-                ..Default::default()
-            };
-            memory_manager.set_instance_data(instance, 999);
+            memory_manager.reserve_instance_space(1);
 
-            // FIXME: We need to use different shader storage space, i'm using slot 999 for the per instance data
-            // because it is free for now, but this should be reserved for scene objects
-            upload_draw_data(memory_manager, resources_manager, skybox, 1, 999);
+            let instance = InstanceData {
+                material_index: skybox.material_id.index(),
+                transform: skybox.transform.transpose(),
+            };
+
+            let base_instance = memory_manager.get_instance_index();
+            memory_manager.push_instance_data(&instance);
+
+            upload_draw_data(memory_manager, resources_manager, skybox, 1, base_instance);
             make_draw_call(self.gl, memory_manager, 1);
         }
     }
@@ -99,8 +102,8 @@ fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_
         gl.multi_draw_elements_indirect_offset(
             gl::TRIANGLES,
             gl::UNSIGNED_INT,
-            ((memory_manager.get_indirect_command_index() 
-                - command_count ) * DRAW_COMMAND_SIZE) as i32,
+            ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
+                as i32,
             command_count as i32,
             0,
         );

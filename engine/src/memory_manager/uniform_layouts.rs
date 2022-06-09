@@ -8,7 +8,6 @@ pub struct ShaderStorageBuffers {
     pub skybox: SkyboxStorageBuffer,
     pub materials: MaterialsStorageBuffer,
     pub matrices: MatricesStorageBuffer,
-    pub instances: InstanceStorageBuffer,
 }
 
 #[repr(C)]
@@ -86,20 +85,4 @@ pub struct Material {
 pub struct MatricesStorageBuffer {
     pub projection: Mat4f,
     pub view: Mat4f,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct InstanceStorageBuffer {
-    pub instance_data: [InstanceData; 1_000],
-}
-
-#[repr(C)]
-#[derive(Default, Clone, Copy)]
-pub struct InstanceData {
-    pub transform: Mat4f,
-    pub material_index: u32,
-    pub _1: Padding,
-    pub _2: Padding,
-    pub _3: Padding,
 }

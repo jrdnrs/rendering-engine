@@ -375,7 +375,6 @@ impl Mat4f {
         matrix[(1, 3)] = - (t + b) / (t - b);
         matrix[(2, 2)] = -2.0 / (far - near);
         matrix[(2, 3)] = - (far + near) / (far - near);
-        matrix[(3, 3)] = 1.0;
 
         matrix
     }

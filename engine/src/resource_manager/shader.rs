@@ -105,6 +105,9 @@ pub enum ShaderData<'a> {
 
 pub struct ShaderBuilder {
     entrypoint: &'static str,
+    includes: Vec<String>,
+    read_string: String,
+    write_string: String,
 }
 
 impl ShaderBuilder {
@@ -114,7 +117,12 @@ impl ShaderBuilder {
             Err(error) => return Err(error.to_string()),
         };
 
-        let sb = ShaderBuilder { entrypoint };
+        let mut sb = ShaderBuilder {
+            entrypoint,
+            includes: Vec::new(),
+            read_string: String::new(),
+            write_string: String::new(),
+        };
         let mut shaders_final = Vec::new();
 
         for shader_source in shaders_source.split("#shader ") {
@@ -130,38 +138,60 @@ impl ShaderBuilder {
                 _ => continue,
             };
 
-            shaders_final.push((
-                shader_type,
-                sb.resolve_includes(&shader_source_no_type.to_string()),
-            ));
+            shaders_final.push((shader_type, sb.resolve_includes(shader_source_no_type)));
         }
 
         Ok(shaders_final)
     }
 
-    fn resolve_includes(&self, shader_source: &String) -> String {
-        let mut final_shader_source = shader_source.clone();
+    fn resolve_includes(&mut self, shader_source: &str) -> String {
+        self.includes.clear();
 
-        for line in shader_source.lines() {
-            if line.trim().starts_with("#include ") {
-                let path = line.split('"').nth(1).unwrap();
-                let include_directive = format!(r#"#include "{path}""#);
+        self.read_string = shader_source.to_owned();
+        self.write_string.clear();
 
-                if let Ok(included_source) = std::fs::read_to_string(path) {
-                    let resolved_included_source = self.resolve_includes(&included_source);
-                    final_shader_source =
-                        final_shader_source.replace(&include_directive, &resolved_included_source);
-                } else {
-                    error!(
-                        "Unable to include '{}' in shader '{}'",
-                        path, self.entrypoint
-                    );
-                    final_shader_source = final_shader_source.replace(&include_directive, "");
+        let mut finished = false;
+
+        while !finished {
+            let mut iter = self.read_string.lines().peekable();
+            while let Some(line) = iter.next() {
+                if line.trim().starts_with("#include ") {
+                    let path = line.split('"').nth(1).unwrap();
+                    let include_directive = format!(r#"#include "{path}""#);
+
+                    // if we've seen this path before, skip
+                    if self.includes.iter().any(|s| s == path) {
+                        self.write_string = self.read_string.replace(&include_directive, "");
+                        break;
+                    } else {
+                        self.includes.push(path.to_owned())
+                    }
+
+                    // replace directive with the file if found
+                    if let Ok(included_source) = std::fs::read_to_string(path) {
+                        self.write_string = self
+                            .read_string
+                            .replace(&include_directive, &included_source);
+                        break;
+                    } else {
+                        error!(
+                            "Unable to include '{}' in shader '{}'",
+                            path, self.entrypoint
+                        );
+                        self.write_string = self.read_string.replace(&include_directive, "");
+                    }
+                }
+
+                if iter.peek().is_none() {
+                    finished = true;
                 }
             }
+
+            // swap the iterated string with the modified one
+            std::mem::swap(&mut self.read_string, &mut self.write_string);
         }
 
-        final_shader_source
+        self.write_string.clone()
     }
 }
 

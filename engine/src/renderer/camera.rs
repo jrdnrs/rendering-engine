@@ -47,7 +47,7 @@ impl Camera {
             view,
             pitch: 0.0,
             yaw: 90.0,
-            projection: Mat4f::orthographic(1.0, size, near, far),
+            projection: Mat4f::orthographic(size, near, far),
             fov_size: size,
             near_plane: near,
             far_plane: far,
@@ -63,7 +63,6 @@ impl Camera {
         match self.projection_type {
             Projection::Orthographic => {
                 self.projection = Mat4f::orthographic(
-                    width / height,
                     self.fov_size,
                     self.near_plane,
                     self.far_plane,

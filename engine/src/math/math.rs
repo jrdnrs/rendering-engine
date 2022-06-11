@@ -356,7 +356,7 @@ impl Mat4f {
         matrix
     }
 
-    pub fn orthographic(aspect_ratio: f32, size: f32, near: f32, far: f32) -> Self {
+    pub fn orthographic(size: f32, near: f32, far: f32) -> Self {
         // let a = aspect_ratio;
         let w = size;
         let h = w ;

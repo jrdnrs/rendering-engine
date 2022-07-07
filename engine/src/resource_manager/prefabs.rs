@@ -330,3 +330,91 @@ pub fn unit_cube_mesh(colour: Vec4f) -> Mesh {
         ],
     }
 }
+
+pub fn sphere(resolution: u32) -> Mesh {
+    let origins = [
+        Vec3f::new(-1.0, -1.0, -1.0),
+        Vec3f::new(1.0, -1.0, -1.0),
+        Vec3f::new(1.0, -1.0, 1.0),
+        Vec3f::new(-1.0, -1.0, 1.0),
+        Vec3f::new(-1.0, 1.0, -1.0),
+        Vec3f::new(-1.0, -1.0, 1.0),
+    ];
+
+    let rights = [
+        Vec3f::new(1.0, 0.0, 0.0),
+        Vec3f::new(0.0, 0.0, 1.0),
+        Vec3f::new(-1.0, 0.0, 0.0),
+        Vec3f::new(0.0, 0.0, -1.0),
+        Vec3f::new(1.0, 0.0, 0.0),
+        Vec3f::new(1.0, 0.0, 0.0),
+    ];
+
+    let ups = [
+        Vec3f::new(0.0, 1.0, 0.0),
+        Vec3f::new(0.0, 1.0, 0.0),
+        Vec3f::new(0.0, 1.0, 0.0),
+        Vec3f::new(0.0, 1.0, 0.0),
+        Vec3f::new(0.0, 0.0, 1.0),
+        Vec3f::new(0.0, 0.0, -1.0),
+    ];
+
+    // let forwards = [
+    //     Vec3f::new(0.0, 0.0, 1.0),
+    //     Vec3f::new(-1.0, 0.0, 0.0),
+    //     Vec3f::new(0.0, 0.0, -1.0),
+    //     Vec3f::new(1.0, 0.0, 0.0),
+    //     Vec3f::new(0.0, -1.0, 0.0),
+    //     Vec3f::new(0.0, 1.0, 0.0),
+    // ];
+
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+
+    let step = 2.0 / resolution as f32;
+
+    for face in 0..6 {
+        let origin = origins[face];
+        let right = rights[face];
+        let up = ups[face];
+        // let forward = forwards[face];
+
+        for u in 0..resolution {
+            for v in 0..resolution {
+                indices.push(vertices.len() as u32 + v + u * (resolution + 1));
+                indices.push(vertices.len() as u32 + v + (u + 1) * (resolution + 1));
+                indices.push(vertices.len() as u32 + (v + 1) + (u + 1) * (resolution + 1));
+                indices.push(vertices.len() as u32 + (v + 1) + (u + 1) * (resolution + 1));
+                indices.push(vertices.len() as u32 + (v + 1) + u * (resolution + 1));
+                indices.push(vertices.len() as u32 + v + u * (resolution + 1));
+            }
+        }
+
+        for u in 0..=resolution {
+            for v in 0..=resolution {
+                let p = origin + (right * u as f32 + up * v as f32) * step;
+                // let n = p.normalise();
+
+                let x2 = p.x * p.x;
+                let y2 = p.y * p.y;
+                let z2 = p.z * p.z;
+
+                let n = Vec3f::new(
+                    p.x * (1.0 - (y2 + z2) / 2.0 + y2 * z2 / 3.0).sqrt(),
+                    p.y * (1.0 - (x2 + z2) / 2.0 + x2 * z2 / 3.0).sqrt(),
+                    p.z * (1.0 - (x2 + y2) / 2.0 + x2 * y2 / 3.0).sqrt(),
+                );
+
+                vertices.push(Vertex {
+                    position: n,
+                    normal: n,
+                    tangent: p.cross(-up).normalise(),
+                    colour: Vec4f::uniform(1.0),
+                    tex_coord: Vec2f::new(u as f32, v as f32) / resolution as f32,
+                });
+            }
+        }
+    }
+
+    Mesh { vertices, indices }
+}

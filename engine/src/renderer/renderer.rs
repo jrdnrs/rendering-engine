@@ -222,26 +222,86 @@ impl<'a> Renderer<'a> {
         let index = id.index() as usize;
         let material = &self.resources_manager.material_manager.resources[index];
 
-        let diff_texture_handle = unsafe {
-            self.gl.get_texture_handle(
-                self.resources_manager.texture_manager.resources
-                    [material.diffuse_texture_id.index() as usize]
-                    .handle,
-            )
+        let diff_texture_handle = match material.diffuse_texture_id {
+            Some(id) => unsafe {
+                let handle = self.gl.get_texture_handle(
+                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
+                );
+                self.gl.make_texture_handle_resident(handle);
+
+                handle.0.get()
+            },
+            None => unsafe {
+                self.gl
+                    .get_texture_handle(
+                        self.resources_manager
+                            .borrow_texture(&self.resources_manager.placeholder_diffuse_texture)
+                            .unwrap()
+                            .handle,
+                    )
+                    .0
+                    .get()
+            },
         };
 
-        unsafe { self.gl.make_texture_handle_resident(diff_texture_handle) }
+        let spec_texture_handle = match material.specular_texture_id {
+            Some(id) => unsafe {
+                let handle = self.gl.get_texture_handle(
+                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
+                );
+                self.gl.make_texture_handle_resident(handle);
+
+                handle.0.get()
+            },
+            None => unsafe {
+                self.gl
+                    .get_texture_handle(
+                        self.resources_manager
+                            .borrow_texture(&self.resources_manager.placeholder_specular_texture)
+                            .unwrap()
+                            .handle,
+                    )
+                    .0
+                    .get()
+            },
+        };
+
+        let norm_texture_handle = match material.normal_texture_id {
+            Some(id) => unsafe {
+                let handle = self.gl.get_texture_handle(
+                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
+                );
+                self.gl.make_texture_handle_resident(handle);
+
+                handle.0.get()
+            },
+            None => unsafe {
+                self.gl
+                    .get_texture_handle(
+                        self.resources_manager
+                            .borrow_texture(&self.resources_manager.placeholder_normal_texture)
+                            .unwrap()
+                            .handle,
+                    )
+                    .0
+                    .get()
+            },
+        };
 
         let material_uniform = uniform_layouts::Material {
             shininess: material.shininess,
             diffuse_texture: Vec2u::new(
-                diff_texture_handle.0.get() as u32,
-                (diff_texture_handle.0.get() >> 32) as u32,
+                diff_texture_handle as u32,
+                (diff_texture_handle >> 32) as u32,
             ),
-            // diffuse_texture: Vec2u::new(
-            //     0,
-            //     0,
-            // ),
+            specular_texture: Vec2u::new(
+                spec_texture_handle as u32,
+                (spec_texture_handle >> 32) as u32,
+            ),
+            normal_texture: Vec2u::new(
+                norm_texture_handle as u32,
+                (norm_texture_handle >> 32) as u32,
+            ),
             ..Default::default()
         };
 

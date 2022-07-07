@@ -19,13 +19,17 @@ pub struct ResourcesManager<'a> {
     pub texture_manager: ResourceManager<Texture<'a>, TextureID>,
     pub framebuffer_manager: ResourceManager<Framebuffer<'a>, FramebufferID>,
 
+    pub placeholder_diffuse_texture: TextureID,
+    pub placeholder_specular_texture: TextureID,
+    pub placeholder_normal_texture: TextureID,
+
     // temp
     pub resize_framebuffers: Vec<FramebufferID>,
 }
 
 impl<'a> ResourcesManager<'a> {
     pub fn new(gl: &'a gl::Context) -> Self {
-        ResourcesManager {
+        let mut rm = ResourcesManager {
             gl,
             mesh_manager: ResourceManager::new(),
             material_manager: ResourceManager::new(),
@@ -33,9 +37,73 @@ impl<'a> ResourcesManager<'a> {
             texture_manager: ResourceManager::new(),
             framebuffer_manager: ResourceManager::new(),
 
+            placeholder_diffuse_texture: TextureID::new(0),
+            placeholder_specular_texture: TextureID::new(0),
+            placeholder_normal_texture: TextureID::new(0),
+
             resize_framebuffers: Vec::new(),
+        };
+
+        rm.placeholder_diffuse_texture = rm
+            .load_texture(
+                "res/textures/placeholders/diffuse.dds",
+                &TextureConfig {
+                    wrap: gl::REPEAT,
+                    mag_filter: gl::LINEAR,
+                    min_filter: gl::LINEAR,
+                    srgb: false,
+                },
+            )
+            .unwrap();
+
+        rm.placeholder_specular_texture = rm
+            .load_texture(
+                "res/textures/placeholders/specular.dds",
+                &TextureConfig {
+                    wrap: gl::REPEAT,
+                    mag_filter: gl::LINEAR,
+                    min_filter: gl::LINEAR,
+                    srgb: false,
+                },
+            )
+            .unwrap();
+
+        rm.placeholder_normal_texture = rm
+            .load_texture(
+                "res/textures/placeholders/normal.dds",
+                &TextureConfig {
+                    wrap: gl::REPEAT,
+                    mag_filter: gl::LINEAR,
+                    min_filter: gl::LINEAR,
+                    srgb: false,
+                },
+            )
+            .unwrap();
+
+        unsafe {
+            let handle = gl.get_texture_handle(
+                rm.borrow_texture(&rm.placeholder_diffuse_texture)
+                    .unwrap()
+                    .handle,
+            );
+            gl.make_texture_handle_resident(handle);
+
+            let handle = gl.get_texture_handle(
+                rm.borrow_texture(&rm.placeholder_specular_texture)
+                    .unwrap()
+                    .handle,
+            );
+            gl.make_texture_handle_resident(handle);
+
+            let handle = gl.get_texture_handle(
+                rm.borrow_texture(&rm.placeholder_normal_texture)
+                    .unwrap()
+                    .handle,
+            );
+            gl.make_texture_handle_resident(handle);
         }
 
+        rm
         // TODO: load default texture and material
     }
 

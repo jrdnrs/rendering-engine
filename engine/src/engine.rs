@@ -84,12 +84,7 @@ impl<'a> Engine<'a> {
                 self.renderer.camera.yaw += x;
                 self.renderer.camera.pitch += y;
 
-                if self.renderer.camera.pitch > 89.0 {
-                    self.renderer.camera.pitch = 89.0
-                };
-                if self.renderer.camera.pitch < -89.0 {
-                    self.renderer.camera.pitch = -89.0
-                };
+                self.renderer.camera.pitch = self.renderer.camera.pitch.clamp(-89.0, 89.0);
 
                 self.renderer.camera.direction = Vec3f::new(
                     self.renderer.camera.yaw.to_radians().cos()
@@ -132,7 +127,7 @@ impl<'a> Engine<'a> {
             }
 
             if self.input.is_key_down(VirtualKeyCode::W) {
-                self.renderer.camera.position -= self.renderer.camera.direction.scalar(move_speed);
+                self.renderer.camera.position -= self.renderer.camera.direction * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::A) {
@@ -142,11 +137,11 @@ impl<'a> Engine<'a> {
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
                     .normalise()
-                    .scalar(move_speed);
+                     * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::S) {
-                self.renderer.camera.position += self.renderer.camera.direction.scalar(move_speed);
+                self.renderer.camera.position += self.renderer.camera.direction * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::D) {
@@ -156,15 +151,15 @@ impl<'a> Engine<'a> {
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
                     .normalise()
-                    .scalar(move_speed);
+                     * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::Space) {
-                self.renderer.camera.position += Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
+                self.renderer.camera.position += Vec3f::new(0.0, 1.0, 0.0) * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::LShift) {
-                self.renderer.camera.position -= Vec3f::new(0.0, 1.0, 0.0).scalar(move_speed);
+                self.renderer.camera.position -= Vec3f::new(0.0, 1.0, 0.0) * move_speed;
             }
         }
     }

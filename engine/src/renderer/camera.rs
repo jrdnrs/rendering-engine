@@ -22,7 +22,7 @@ impl Camera {
     pub fn new_perspective(fov: f32, near: f32, far: f32) -> Self {
         let position = Vec3f::new(0.0, 0.0, -3.0);
         let direction = Vec3f::new(0.0, 0.0, 1.0);
-        let view = Self::look_at(&position, &direction);
+        let view = Self::look_at(&position, &direction, &Vec3f::new(0.0, 1.0, 0.0));
         Camera {
             position,
             direction,
@@ -40,7 +40,7 @@ impl Camera {
     pub fn new_orthographic(size: f32, near: f32, far: f32) -> Self {
         let position = Vec3f::new(0.0, 0.0, -3.0);
         let direction = Vec3f::new(0.0, 0.0, 1.0);
-        let view = Self::look_at(&position, &direction);
+        let view = Self::look_at(&position, &direction, &Vec3f::new(0.0, 1.0, 0.0));
         Camera {
             position,
             direction,
@@ -56,7 +56,7 @@ impl Camera {
     }
 
     pub fn update_view(&mut self) {
-        self.view = Self::look_at(&self.position, &self.direction);
+        self.view = Self::look_at(&self.position, &self.direction, &Vec3f::new(0.0, 1.0, 0.0));
     }
 
     pub fn update_projection(&mut self, width: f32, height: f32) {
@@ -79,10 +79,10 @@ impl Camera {
         };
     }
 
-    pub fn look_at(position: &Vec3f, direction: &Vec3f) -> Mat4f {
+    pub fn look_at(position: &Vec3f, direction: &Vec3f, up: &Vec3f) -> Mat4f {
         let (px, py, pz) = (position.x, position.y, position.z);
         let (dx, dy, dz) = (direction.x, direction.y, direction.z);
-        let (lx, ly, lz) = Vec3f::new(0.0, 1.0, 0.0)
+        let (lx, ly, lz) = up
             .cross(*direction)
             .normalise()
             .as_tuple();

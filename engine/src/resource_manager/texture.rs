@@ -16,11 +16,9 @@ pub struct TextureConfig {
 fn get_internal_format(format: u32, srgb: bool) -> u32 {
     if srgb {
         match format {
-            gl::RGB => gl::SRGB,
-            gl::RGBA => gl::SRGB_ALPHA,
+            gl::RGB8 | gl::RGB16 | gl::RGB32F => gl::SRGB8,
+            gl::RGBA8 | gl::RGBA16 | gl::RGBA32F => gl::SRGB8_ALPHA8,
             gl::COMPRESSED_RGBA_BPTC_UNORM => gl::COMPRESSED_SRGB_ALPHA_BPTC_UNORM,
-            gl::RGB8 => gl::SRGB8,
-            gl::RGBA8 => gl::SRGB8_ALPHA8,
             _ => {
                 error!("Failed to find SRGB equivalent for '{}'", format);
                 format
@@ -61,7 +59,7 @@ impl<'a> Texture<'a> {
         let width = image.width;
         let height = image.height;
         let format = image.format;
-        let internal_format = get_internal_format(format, config.srgb);
+        let internal_format = get_internal_format(image.internal_format, config.srgb);
         let data_type = image.data_type;
 
         let handle = unsafe {
@@ -124,7 +122,7 @@ impl<'a> Texture<'a> {
                     0,
                     width as i32,
                     height as i32,
-                    internal_format,
+                    format,
                     data_type,
                     gl::PixelUnpackData::Slice(&image.bytes),
                 );
@@ -159,7 +157,7 @@ impl<'a> Texture<'a> {
 
         // TODO: Ensure that all images have same format/dimensions
         let format = images[0].format;
-        let internal_format = get_internal_format(format, config.srgb);
+        let internal_format = get_internal_format(images[0].internal_format, config.srgb);
         let width = images[0].width;
         let height = images[0].height;
         let data_type = images[0].data_type;
@@ -233,7 +231,7 @@ impl<'a> Texture<'a> {
                         width as i32,
                         height as i32,
                         1,
-                        internal_format,
+                        format,
                         data_type,
                         gl::PixelUnpackData::Slice(&image.bytes),
                     );

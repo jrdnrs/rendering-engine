@@ -5,6 +5,7 @@ use std::{
 
 use glow::{self as gl, HasContext};
 use image::{self, DynamicImage::*};
+use log::error;
 
 fn as_u32_le(array: &[u8; 4]) -> u32 {
     ((array[0] as u32) << 0)
@@ -171,10 +172,13 @@ impl BptcImage {
     }
 }
 
+
+
 #[derive(Default)]
 pub struct GlImage {
     pub path: &'static str,
     pub format: u32,
+    pub internal_format: u32,
     pub compressed: bool,
     pub mipmap_count: u32,
     pub data_type: u32,
@@ -199,7 +203,8 @@ impl GlImage {
 
             return Ok(Self {
                 path,
-               format,
+                format,
+                internal_format: format,
                 compressed: true,
                 mipmap_count: bptc_image.header.mipmap_count,
                 data_type: 0, // unused
@@ -210,13 +215,13 @@ impl GlImage {
         }
 
         if let Ok(image) = image::open(path) {
-            let (format, data_type) = match image {
-                ImageRgb8(_) => (gl::RGB, gl::UNSIGNED_BYTE),
-                ImageRgba8(_) => (gl::RGBA, gl::UNSIGNED_BYTE),
-                ImageRgb16(_) => (gl::RGB, gl::UNSIGNED_SHORT),
-                ImageRgba16(_) => (gl::RGBA, gl::UNSIGNED_SHORT),
-                ImageRgb32F(_) => (gl::RGB, gl::FLOAT),
-                ImageRgba32F(_) => (gl::RGBA, gl::FLOAT),
+            let (format, internal_format, data_type) = match image {
+                ImageRgb8(_) => (gl::RGB, gl::RGB8, gl::UNSIGNED_BYTE),
+                ImageRgba8(_) => (gl::RGBA, gl::RGBA8,gl::UNSIGNED_BYTE),
+                ImageRgb16(_) => (gl::RGB, gl::RGB16, gl::UNSIGNED_SHORT),
+                ImageRgba16(_) => (gl::RGBA, gl::RGBA16, gl::UNSIGNED_SHORT),
+                ImageRgb32F(_) => (gl::RGB, gl::RGB32F, gl::FLOAT),
+                ImageRgba32F(_) => (gl::RGBA, gl::RGBA32F, gl::FLOAT),
                 _ => {
                     return Err(io::Error::from(ErrorKind::InvalidData));
                 }
@@ -224,8 +229,9 @@ impl GlImage {
             return Ok(Self {
                 path,
                 format,
+                internal_format,
                 compressed: false,
-                mipmap_count: 0,
+                mipmap_count: 1,
                 data_type,
                 width: image.width(),
                 height: image.height(),

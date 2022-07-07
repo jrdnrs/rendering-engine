@@ -245,7 +245,12 @@ pub struct VertexArray<'a> {
 }
 
 impl<'a> VertexArray<'a> {
-    pub fn new(gl: &'a gl::Context, layouts: Vec<BufferLayout>, ebo_size: u32, multiple: u32) -> Self {
+    pub fn new(
+        gl: &'a gl::Context,
+        layouts: Vec<BufferLayout>,
+        ebo_size: u32,
+        multiple: u32,
+    ) -> Self {
         let vao = unsafe { gl.create_named_vertex_array().unwrap() };
 
         let mut vbos = Vec::new();
@@ -271,6 +276,16 @@ impl<'a> VertexArray<'a> {
         vertex_array.attach_index_buffer();
 
         vertex_array
+    }
+
+    pub fn set_divisor(&mut self, buffer_index: usize, divisor: u32) {
+        if self.vertex_layouts[buffer_index].divisor != divisor {
+            self.vertex_layouts[buffer_index].divisor = divisor;
+            unsafe {
+                self.gl
+                    .vertex_array_binding_divisor(self.handle, buffer_index as u32, divisor);
+            }
+        }
     }
 
     fn attach_vertex_buffers(&self) {
@@ -415,8 +430,7 @@ impl<'a> BufferLockManager<'a> {
                 {
                     gl::ALREADY_SIGNALED | gl::CONDITION_SATISFIED => {
                         // trace!("{}", format!(
-                        //     "Completed for '{}' at range: {}-{}",
-                        //     gl_buffer_target(self.buffer_target),
+                        //     "Completed lock at range: {}-{}",
                         //     buffer_lock.start,
                         //     buffer_lock.start + buffer_lock.length
                         // ));
@@ -437,7 +451,7 @@ impl<'a> BufferLockManager<'a> {
                             )
                         );
                         wait_flags = gl::SYNC_FLUSH_COMMANDS_BIT;
-                        wait_duration = 1_000_000_000
+                        wait_duration = 1_000_000; // nanoseconds
                     }
                 }
             }
@@ -453,10 +467,13 @@ pub struct BufferStorage<'a> {
     pub handle: gl::Buffer,
     pub buffer_lock_man: BufferLockManager<'a>,
     buffer_base_pointer: *mut u8,
-    section_buffer_index: u32, // index into current section, not entire buffer
+
+    pub buffer_section_offset: u32, // offset in entire buffer to the current section
+
+    sections: u32,
     section_size_bytes: u32,
     pub current_section: u32,
-    sections: u32,
+    section_buffer_index: u32, // index into current section, not entire buffer
 }
 
 impl<'a> BufferStorage<'a> {
@@ -477,27 +494,26 @@ impl<'a> BufferStorage<'a> {
             handle,
             buffer_lock_man: BufferLockManager::new(gl),
             buffer_base_pointer,
-            section_buffer_index: 0,
+
+            buffer_section_offset: 0,
+
+            sections: multiple,
             section_size_bytes: size_bytes,
             current_section: 0,
-            sections: multiple,
+            section_buffer_index: 0,
         }
     }
 
     /// Round-robin to next section, if there are more than one
     pub fn next_section(&mut self) {
         self.current_section = (self.current_section + 1) % self.sections;
+        self.buffer_section_offset = self.section_size_bytes * self.current_section;
     }
 
     /// As section_buffer_index is a section-local index, this applies an offset with respect to current section
     /// to get an offset into the entire buffer
     pub fn current_buffer_index(&self) -> u32 {
-        self.section_buffer_index + self.current_section_buffer_offset()
-    }
-
-    /// Offset in entire buffer to the current section
-    pub fn current_section_buffer_offset(&self) -> u32 {
-        self.section_size_bytes * self.current_section
+        self.section_buffer_index + self.buffer_section_offset
     }
 
     /// Reset the section-local buffer index to 0
@@ -505,15 +521,24 @@ impl<'a> BufferStorage<'a> {
         self.section_buffer_index = 0;
     }
 
+    /// Reset the section-local buffer index to 0
+    pub fn increase_index(&mut self, increment: u32) {
+        self.section_buffer_index += increment;
+    }
+
     /// Wraps buffer_index if the required size_bytes can not fit contigiously in the buffer and waits for any
     /// fences associated with the range to be met.
     pub fn reserve(&mut self, size_bytes: u32) {
         if self.section_buffer_index + size_bytes > self.section_size_bytes {
             self.section_buffer_index = 0;
+            // error!(
+            //     "'{}' has overflowed, and mid frame sync is currently disabled",
+            //     gl_buffer_target(self.gl_target)
+            // )
         }
 
-        self.buffer_lock_man
-            .wait_for_locked_range(self.current_buffer_index(), size_bytes)
+        // self.buffer_lock_man
+        //     .wait_for_locked_range(self.current_buffer_index(), size_bytes)
     }
 
     /// Sets a fence at the current point in the command stream. <br>
@@ -561,7 +586,7 @@ impl<'a> BufferStorage<'a> {
             std::ptr::copy_nonoverlapping(
                 data.as_ptr(),
                 self.buffer_base_pointer
-                    .add(self.current_section_buffer_offset() as usize + offset),
+                    .add(self.buffer_section_offset as usize + offset),
                 data.len(),
             );
         }
@@ -572,7 +597,7 @@ impl<'a> BufferStorage<'a> {
             std::ptr::copy_nonoverlapping(
                 data as *const T as *const u8,
                 self.buffer_base_pointer
-                    .add(self.current_section_buffer_offset() as usize + offset),
+                    .add(self.buffer_section_offset as usize + offset),
                 std::mem::size_of::<T>(),
             );
         }

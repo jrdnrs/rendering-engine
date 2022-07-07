@@ -61,9 +61,6 @@ impl<'a> PipelineStage for SceneStage<'a> {
     ) {
         unsafe { self.gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) }
 
-        renderer_state.upload_camera_data(memory_manager);
-        renderer_state.upload_light_data(memory_manager);
-
         self.command_queue.update_keys(&self.renderables);
         self.command_queue.sort_indices();
 

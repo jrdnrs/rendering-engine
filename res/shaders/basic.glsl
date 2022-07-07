@@ -1,30 +1,22 @@
 #shader vertex
-#version 460 core
-#include "res/shaders/common/defs/material.glsl"
+#version 450 core
+#include "res/shaders/common/buffers/materialsBuffer.glsl"
+#include "res/shaders/common/buffers/matricesBuffer.glsl"
 
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_normal;
-layout(location = 2) in vec4 a_colour;
-layout(location = 3) in vec2 a_texCoord;
+layout(location = 2) in vec3 a_tangent;
+layout(location = 3) in vec4 a_colour;
+layout(location = 4) in vec2 a_texCoord;
 
-layout(location = 4) in int a_materialIndex;
-layout(location = 5) in mat4 a_transform;
+layout(location = 5) in uint a_materialIndex;
+layout(location = 6) in mat4 a_transform;
 
 
 out VS_OUT {
     vec2 texCoord;
-    Material material;
+    flat Material material;
 } vs_out;
-
-layout (std430, binding = 2) buffer Materials {
-    Material materials[100];
-};
-
-layout (std430, binding = 3) buffer Matrices {
-    mat4 projection;
-    mat4 view;
-};
-
 
 
 void main() {
@@ -37,17 +29,17 @@ void main() {
 
 ///////////////////////////////////////////////////////////////////////////////////////
 #shader fragment
-#version 460 core
+#version 450 core
 #extension GL_ARB_bindless_texture : require
 #include "res/shaders/common/defs/material.glsl"
 
 in VS_OUT {
     vec2 texCoord;
-    Material material;
+    flat Material material;
 } vs_in;
 
-out vec4 FragColour;
+out vec4 FragColor;
 
 void main() {
-    FragColour = texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord);
+    FragColor = texture(sampler2D(vs_in.material.diffuseTexture), vs_in.texCoord);
 }

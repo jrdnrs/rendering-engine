@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use colored::*;
 use gl::UniformLocation;
 use glow::{self as gl, HasContext};
-use log::{debug, error};
+use log::{debug, error, trace};
 
 use crate::math::Mat4f;
 
@@ -130,6 +130,7 @@ impl ShaderBuilder {
                 Some(("vertex", s)) => (gl::VERTEX_SHADER, s),
                 Some(("fragment", s)) => (gl::FRAGMENT_SHADER, s),
                 Some(("geometry", s)) => (gl::GEOMETRY_SHADER, s),
+                Some(("compute", s)) => (gl::COMPUTE_SHADER, s),
                 Some((st, _)) => {
                     return Err(format!("Unknown Shader Type Declared '{st}'")
                         .red()
@@ -251,7 +252,7 @@ impl<'a> Program<'a> {
             // We associate the shader object with a source code string
             self.gl.shader_source(shader, shader_source);
 
-            debug!(
+            trace!(
                 "{}",
                 format!(
                     "Adding {} Shader from '{}'",
@@ -261,6 +262,8 @@ impl<'a> Program<'a> {
                         "Fragment"
                     } else if shader_type == gl::GEOMETRY_SHADER {
                         "Geometry"
+                    } else if shader_type == gl::COMPUTE_SHADER {
+                        "Compute"
                     } else {
                         "Unknown" // TODO: Add more types
                     },

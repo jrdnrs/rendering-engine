@@ -1,8 +1,7 @@
 use glow::{self as gl, HasContext};
 
 use crate::{
-    math::math::*,
-    memory_manager::{memory_manager::MemoryManager, uniform_layouts::Light},
+    math::*,
     resource_manager::resource_manager::{
         FramebufferID, ResourceIDTrait, ResourceManagerTrait, ResourcesManager, ShaderProgramID,
     },

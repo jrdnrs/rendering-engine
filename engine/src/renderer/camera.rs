@@ -1,4 +1,4 @@
-use crate::math::math::*;
+use crate::math::*;
 
 pub enum Projection {
     Orthographic,

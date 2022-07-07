@@ -1,4 +1,4 @@
-use crate::math::math::*;
+use crate::math::*;
 
 type Padding = u32;
 

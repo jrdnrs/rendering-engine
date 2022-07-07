@@ -5,7 +5,7 @@ use gl::UniformLocation;
 use glow::{self as gl, HasContext};
 use log::{debug, error};
 
-use crate::math::math::Mat4f;
+use crate::math::Mat4f;
 
 pub fn shader_data_element_count(type_: &ShaderDataType) -> i32 {
     match type_ {

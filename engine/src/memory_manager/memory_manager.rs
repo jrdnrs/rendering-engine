@@ -6,7 +6,7 @@ use memoffset::offset_of;
 
 use super::{buffer::*, uniform_layouts::*};
 use crate::{
-    math::math::{Mat4f, Vec2u, Vec3f},
+    math::{Mat4f, Vec3f},
     resource_manager::{model::VERTEX_SIZE, shader::ShaderDataType},
 };
 

@@ -3,7 +3,7 @@ use glow::{self as gl, HasContext};
 use super::PipelineStage;
 use crate::{
     components::Renderable,
-    math::math::Mat4f,
+    math::Mat4f,
     memory_manager::memory_manager::{
         DrawElementsIndirectCommand, InstanceData, MemoryManager, DRAW_COMMAND_SIZE,
     },

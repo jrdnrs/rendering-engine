@@ -15,7 +15,7 @@ use crate::{
     components,
     context::Context,
     input::input::Input,
-    math::math::*,
+    math::*,
     memory_manager::uniform_layouts::Light,
     renderer::{pipeline_stages, renderer::Renderer},
     resource_manager::{

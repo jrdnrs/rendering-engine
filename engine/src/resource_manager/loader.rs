@@ -1,6 +1,6 @@
 use tobj;
 
-use crate::math::math::Vec3f;
+use crate::math::Vec3f;
 
 const LOAD_OPTIONS: tobj::LoadOptions = tobj::LoadOptions {
     single_index: true,

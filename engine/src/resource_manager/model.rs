@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use super::resource_manager::TextureID;
-use crate::math::math::*;
+use crate::math::*;
 
 pub const VERTEX_SIZE: u32 = std::mem::size_of::<Vertex>() as u32;
 

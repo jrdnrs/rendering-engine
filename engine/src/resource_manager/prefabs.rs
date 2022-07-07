@@ -1,6 +1,4 @@
-use crate::{math::math::*, resource_manager::model::*};
-
-
+use crate::{math::*, resource_manager::model::*};
 
 pub fn axis() -> Mesh {
     let vertices = vec![

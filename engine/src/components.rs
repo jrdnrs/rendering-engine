@@ -1,5 +1,5 @@
 use crate::{
-    math::math::*,
+    math::*,
     resource_manager::resource_manager::{MaterialID, MeshID, ShaderProgramID},
 };
 

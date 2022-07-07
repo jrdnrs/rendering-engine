@@ -121,6 +121,16 @@ impl<'a> Engine<'a> {
                 }
             }
 
+            if self.input.is_key_down(VirtualKeyCode::F3) {
+                if self.renderer.renderer_pipeline.is_enabled(pipeline_stages::STAGE_DEBUG) {
+                    debug!("Debug render stage: OFF");
+                    self.renderer.renderer_pipeline.disable_stages(pipeline_stages::STAGE_DEBUG)
+                } else {
+                    debug!("Debug render stage: ON");
+                    self.renderer.renderer_pipeline.enable_stages(pipeline_stages::STAGE_DEBUG)
+                }
+            }
+
             if self.input.is_key_down(VirtualKeyCode::W) {
                 self.renderer.camera.position -= self.renderer.camera.direction.scalar(move_speed);
             }

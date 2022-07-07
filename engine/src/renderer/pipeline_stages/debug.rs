@@ -21,7 +21,8 @@ use crate::{
 pub struct DebugStage<'a> {
     gl: &'a gl::Context,
     target: FramebufferID,
-    debug_shader_id: ShaderProgramID,
+    wireframe_shader_id: ShaderProgramID,
+    vertices_shader_id: ShaderProgramID,
     renderables: Vec<Renderable>,
     command_queue: DrawCommands,
     pending_indirect_command_count: u32,
@@ -33,7 +34,8 @@ impl<'a> DebugStage<'a> {
         target: FramebufferID,
         resources_manager: &mut ResourcesManager,
     ) -> Self {
-        let debug_shader_id = resources_manager.load_shader("res/shaders/debug.glsl");
+        let wireframe_shader_id = resources_manager.load_shader("res/shaders/debug_wireframe.glsl");
+        let vertices_shader_id = resources_manager.load_shader("res/shaders/debug_vertices.glsl");
 
         Self {
             gl,
@@ -41,7 +43,8 @@ impl<'a> DebugStage<'a> {
             renderables: Vec::new(),
             command_queue: DrawCommands::new(hash),
             pending_indirect_command_count: 0,
-            debug_shader_id,
+            wireframe_shader_id,
+            vertices_shader_id,
         }
     }
 }
@@ -69,12 +72,6 @@ impl<'a> PipelineStage for DebugStage<'a> {
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
     ) {
-        renderer_state.set_rasteriser_state(RasteriserState {
-            depth: false,
-            ..Default::default()
-        });
-        renderer_state.set_shader_program(self.debug_shader_id, resources_manager);
-
         self.command_queue.update_keys(&self.renderables);
         self.command_queue.sort_indices();
 
@@ -127,11 +124,32 @@ impl<'a> PipelineStage for DebugStage<'a> {
                 instance_count = 0;
             }
         }
+        
+        unsafe {
+            self.gl.polygon_mode(gl::FRONT_AND_BACK, gl::LINE);
+        }
+        renderer_state.set_shader_program(self.wireframe_shader_id, resources_manager);
+        make_draw_call(
+            self.gl,
+            memory_manager,
+            self.pending_indirect_command_count,
+            gl::TRIANGLES,
+        );
 
-        make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+        unsafe {
+            self.gl.polygon_mode(gl::FRONT_AND_BACK, gl::FILL);
+        }
+
+        renderer_state.set_shader_program(self.vertices_shader_id, resources_manager);
+        make_draw_call(
+            self.gl,
+            memory_manager,
+            self.pending_indirect_command_count,
+            gl::POINTS,
+        );
+
         self.pending_indirect_command_count = 0;
         self.renderables.clear();
-
     }
 }
 
@@ -161,10 +179,15 @@ fn upload_draw_data(
     memory_manager.push_index_slice(&mesh.indices);
 }
 
-fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: u32) {
+fn make_draw_call(
+    gl: &gl::Context,
+    memory_manager: &mut MemoryManager,
+    command_count: u32,
+    mode: u32,
+) {
     unsafe {
         gl.multi_draw_elements_indirect_offset(
-            gl::LINES,
+            mode,
             gl::UNSIGNED_INT,
             ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
                 as i32,

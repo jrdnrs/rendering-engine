@@ -5,8 +5,8 @@ use super::{
     camera::Camera,
     pipeline::RendererPipeline,
     pipeline_stages::{
-        debug::DebugStage, post_process::PostProcessStage, scene::SceneStage, shadow::ShadowStage,
-        sky::SkyStage, *,
+        bloom::BloomStage, debug::DebugStage, post_process::PostProcessStage, scene::SceneStage,
+        shadow::ShadowStage, sky::SkyStage, *,
     },
     state::RendererState,
 };
@@ -86,6 +86,10 @@ impl<'a> Renderer<'a> {
             .add_stage(SceneStage::new(self.gl, fb_id), STAGE_SCENE);
         self.renderer_pipeline
             .add_stage(SkyStage::new(self.gl, fb_id), STAGE_SKY);
+        self.renderer_pipeline.add_stage(
+            BloomStage::new(self.gl, fb_id, &mut self.resources_manager),
+            STAGE_BLOOM,
+        );
         self.renderer_pipeline.add_stage(
             DebugStage::new(self.gl, fb_id, &mut self.resources_manager),
             STAGE_DEBUG,

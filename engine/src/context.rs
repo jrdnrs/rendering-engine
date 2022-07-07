@@ -63,6 +63,22 @@ impl Context {
                     "Compatability"
                 }
             );
+            info!(
+                "Uniform Buffer Offset Alignment: {} B",
+                gl.get_parameter_i32(gl::UNIFORM_BUFFER_OFFSET_ALIGNMENT),
+            );
+            info!(
+                "Uniform Buffer Size: {:.2} MB",
+                gl.get_parameter_i64(gl::MAX_UNIFORM_BLOCK_SIZE) as f64 / 1_000_000.0,
+            );
+            info!(
+                "Shader Storage Offset Alignment: {} B",
+                gl.get_parameter_i32(gl::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT),
+            );
+            info!(
+                "Shader Storage Size: {:.2} MB",
+                gl.get_parameter_i64(gl::MAX_SHADER_STORAGE_BLOCK_SIZE) as f64 / 1_000_000.0,
+            );
 
             let frametime = time::Duration::from_secs_f32(1.0 / crate::FPS as f32);
             let target_time = time::Instant::from(time::Instant::now() + frametime);

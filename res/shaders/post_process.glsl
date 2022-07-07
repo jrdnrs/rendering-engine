@@ -1,13 +1,14 @@
 #shader vertex
-#version 460 core
+#version 450 core
 
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_normal;
-layout(location = 2) in vec4 a_colour;
-layout(location = 3) in vec2 a_texCoord;
+layout(location = 2) in vec3 a_tangent;
+layout(location = 3) in vec4 a_colour;
+layout(location = 4) in vec2 a_texCoord;
 
-layout(location = 4) in int a_materialIndex;
-layout(location = 5) in mat4 a_transform;
+layout(location = 5) in uint a_materialIndex;
+layout(location = 6) in mat4 a_transform;
 
 out vec2 texCoord;
 
@@ -19,31 +20,30 @@ void main()
 
 
 #shader fragment
-#version 460 core
+#version 450 core
 #extension GL_ARB_bindless_texture : require
-
-out vec4 FragColor;
-  
-in vec2 texCoord;
+#include "res/shaders/common/buffers/lightsBuffer.glsl"
+#include "res/shaders/common/buffers/shadowMapsBuffer.glsl"
 
 uniform sampler2D screenTexture;
 
-#include "res/shaders/common/defs/light.glsl"
-layout (std430, binding = 0) buffer Lights {
-    Light allLights[32];
-    mat4 lightViews[32];
-    mat4 lightProjection;
-    uvec2 shadowMaps[32];
-    int lightCount;
-    vec3 cameraDir;
-    vec3 cameraPos;
-};
+in vec2 texCoord;
+
+out vec4 FragColor;
 
 void main()
 { 
-    // float depthValue = texture(sampler2D(shadowMaps[0]), texCoord).r;
+    // float depthValue = texture( sampler2D(directionalShadowMap),texCoord).r;
     // FragColor = vec4(vec3(depthValue), 1.0);
 
-    float gamma = 2.2;
-    FragColor = vec4(pow(texture(screenTexture, texCoord).rgb, vec3(1.0/gamma)), 1.0);
+    const float gamma = 2.2;
+    const float exposure = 1.0;
+    vec3 hdrColor = texture(screenTexture, texCoord).rgb;
+  
+    // exposure tone mapping
+    vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+    // gamma correction 
+    mapped = pow(mapped, vec3(1.0 / gamma));
+  
+    FragColor = vec4(mapped, 1.0);
 }

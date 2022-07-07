@@ -750,9 +750,9 @@ impl<'a> Engine<'a> {
                 }
                 Event::RedrawRequested(_) => {
                     self.update();
-                    unsafe {
-                        self.gl.flush();
-                    }
+                    // unsafe {
+                    //     self.gl.flush();
+                    // }
                     self.context.window_context.swap_buffers().unwrap();
 
                     let now = time::Instant::now();

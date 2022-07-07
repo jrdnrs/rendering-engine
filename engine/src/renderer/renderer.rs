@@ -15,7 +15,7 @@ use crate::{
     math::math::*,
     memory_manager::{
         memory_manager::MemoryManager,
-        uniform_layouts::{self, Light},
+        uniform_layouts::{self, DirectionalLight, PointLight, SpotLight},
     },
     resource_manager::{
         framebuffer::{Framebuffer, FramebufferAttachment, FramebufferConfig},
@@ -118,12 +118,65 @@ impl<'a> Renderer<'a> {
         unsafe { self.gl.clear_color(r, g, b, a) }
     }
 
-    pub fn clear(&self) {
-        unsafe { self.gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) }
+    pub fn add_point_light(&mut self, mut light: PointLight) {
+        light.views[0] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(-1.0, 0.0, 0.0),
+                &Vec3f::new(0.0, -1.0, 0.0),
+            );
+        light.views[1] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(1.0, 0.0, 0.0),
+                &Vec3f::new(0.0, -1.0, 0.0),
+            );
+        light.views[2] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(0.0, -1.0, 0.0),
+                &Vec3f::new(0.0, 0.0, 1.0),
+            );
+        light.views[3] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(0.0, 1.0, 0.0),
+                &Vec3f::new(0.0, 0.0, -1.0),
+            );
+        light.views[4] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(0.0, 0.0, -1.0),
+                &Vec3f::new(0.0, -1.0, 0.0),
+            );
+        light.views[5] = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &Vec3f::new(0.0, 0.0, 1.0),
+                &Vec3f::new(0.0, -1.0, 0.0),
+            );
+
+        self.renderer_state.point_lights.push(light);
     }
 
-    pub fn add_light(&mut self, light: Light) {
-        self.renderer_state.lights.push(light);
+    pub fn add_spot_light(&mut self, mut light: SpotLight) {
+        light.view = self.renderer_state.light_persp_projection
+            * Camera::look_at(
+                &light.position,
+                &light.direction,
+                &Vec3f::new(0.0, 1.0, 0.0),
+            );
+        self.renderer_state.spot_lights.push(light);
+    }
+
+    pub fn set_directional_light(&mut self, mut light: DirectionalLight) {
+        light.view = self.renderer_state.light_ortho_projection
+            * Camera::look_at(
+                &light.position,
+                &light.direction,
+                &Vec3f::new(0.0, 1.0, 0.0),
+            );
+        self.renderer_state.directional_light = Some(light);
     }
 
     pub fn begin(&mut self) {
@@ -136,14 +189,20 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn end(&mut self) {
+        self.memory_manager.wait_for_section_lock();
+        self.renderer_state
+            .upload_camera_data(&mut self.memory_manager);
+        self.renderer_state
+            .upload_light_data(&mut self.memory_manager);
         self.renderer_pipeline.execute(
             &mut self.memory_manager,
             &mut self.resources_manager,
             &mut self.renderer_state,
         );
         self.memory_manager.set_section_lock();
+
         self.memory_manager.advance_sections();
-        self.renderer_state.lights.clear();
+        self.renderer_state.reset_lights();
     }
 
     pub fn draw(&mut self, renderable: &Renderable) {

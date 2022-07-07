@@ -16,11 +16,11 @@ use crate::{
     context::Context,
     input::input::Input,
     math::*,
-    memory_manager::uniform_layouts::Light,
+    memory_manager::uniform_layouts::{DirectionalLight, PointLight, SpotLight},
     renderer::{pipeline_stages, renderer::Renderer},
     resource_manager::{
         model::Material,
-        prefabs::{self, unit_cube_mesh},
+        prefabs::{self, sphere, unit_cube_mesh},
         texture::TextureConfig,
     },
 };
@@ -180,7 +180,18 @@ impl<'a> Engine<'a> {
         let ground_texture_id = self
             .renderer
             .load_texture(
-                "res/textures/cobblestone_mossy.dds",
+                "res/textures/mossy_cobblestone.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let wood_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/oak_planks.dds",
                 &TextureConfig {
                     min_filter: gl::LINEAR_MIPMAP_LINEAR,
                     srgb: true,
@@ -189,27 +200,106 @@ impl<'a> Engine<'a> {
             )
             .unwrap();
 
+        let lamp_specular_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/lamp_s.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let wood_specular_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/oak_planks_s.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let lamp_normal_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/lamp_n.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let ground_normal_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/mossy_cobblestone_n.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let wood_normal_texture_id = self
+            .renderer
+            .load_texture(
+                "res/textures/oak_planks_n.dds",
+                &TextureConfig {
+                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    srgb: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
         let basic_shader_id = self.renderer.load_shader("res/shaders/basic.glsl");
-        let light_shader_id = self.renderer.load_shader("res/shaders/light.glsl");
+        let light_shader_id = self.renderer.load_shader("res/shaders/lighting.glsl");
         let skybox_shader_id = self.renderer.load_shader("res/shaders/skybox.glsl");
 
         let ground_material_id = self.renderer.load_material(Material {
             shininess: 16.0,
-            diffuse_texture_id: ground_texture_id,
-            specular_texture_id: ground_texture_id,
+            diffuse_texture_id: Some(ground_texture_id),
+            specular_texture_id: None,
+            normal_texture_id: Some(ground_normal_texture_id),
+        });
+
+        let wood_material_id = self.renderer.load_material(Material {
+            shininess: 16.0,
+            diffuse_texture_id: Some(wood_texture_id),
+            specular_texture_id: Some(wood_specular_texture_id),
+            normal_texture_id: Some(wood_normal_texture_id),
+        });
+
+        let blank_material_id = self.renderer.load_material(Material {
+            shininess: 16.0,
+            diffuse_texture_id: None,
+            specular_texture_id: None,
+            normal_texture_id: None,
         });
 
         let lamp_material_id = self.renderer.load_material(Material {
-            shininess: 32.0,
-            diffuse_texture_id: lamp_texture_id,
-            specular_texture_id: lamp_texture_id,
+            shininess: 128.0,
+            diffuse_texture_id: Some(lamp_texture_id),
+            specular_texture_id: Some(lamp_specular_texture_id),
+            normal_texture_id: Some(lamp_normal_texture_id),
         });
 
         let cube_model_id = self
             .renderer
             .load_mesh(unit_cube_mesh(Vec4f::new(0.95, 0.85, 0.65, 0.85)));
 
-        self.world.register_component::<components::LightBlock>();
+        let sphere_model_id = self.renderer.load_mesh(sphere(12));
+
+        self.world
+            .register_component::<components::SpotLightBlock>();
+        self.world
+            .register_component::<components::PointLightBlock>();
+        self.world.register_component::<components::DirLightBlock>();
         self.world.register_component::<components::Block>();
         self.world.register_component::<components::Renderable>();
 
@@ -235,8 +325,9 @@ impl<'a> Engine<'a> {
 
         let skybox_material_id = self.renderer.load_material(Material {
             shininess: 0.0,
-            diffuse_texture_id: skybox_texture_id,
-            specular_texture_id: skybox_texture_id,
+            diffuse_texture_id: Some(skybox_texture_id),
+            specular_texture_id: None,
+            normal_texture_id: None,
         });
 
         let skybox = self.world.create_entity();
@@ -249,7 +340,7 @@ impl<'a> Engine<'a> {
         };
         _ = self.world.set_component(&skybox, skybox_component);
 
-        let cubes = 25;
+        let cubes = 50;
         let mut position = Vec3f::new(0.0, 0.0, 5.0);
         for _ in 0..cubes {
             position.z -= cubes as f32;
@@ -271,7 +362,7 @@ impl<'a> Engine<'a> {
                         material_id: ground_material_id,
                         shader_id: light_shader_id,
                         transform: Mat4f::translate(position.x, position.y, position.z),
-                        pipeline_stages: pipeline_stages::STAGE_SCENE ,
+                        pipeline_stages: pipeline_stages::STAGE_SCENE,
                     },
                 );
 
@@ -286,29 +377,135 @@ impl<'a> Engine<'a> {
                 &block,
                 components::Renderable {
                     mesh_id: cube_model_id,
-                    material_id: ground_material_id,
+                    material_id: wood_material_id,
                     shader_id: light_shader_id,
-                    transform: Mat4f::translate(12.0, i as f32, -8.0),
-                    pipeline_stages: pipeline_stages::STAGE_SCENE| pipeline_stages::STAGE_SHADOW,
+                    transform: Mat4f::translate(3.0, i as f32, -5.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW ,
                 },
             );
         }
 
+        for i in 1..6 {
+            let block = self.world.create_entity();
+            _ = self.world.set_component(&block, components::Block {});
+            _ = self.world.set_component(
+                &block,
+                components::Renderable {
+                    mesh_id: cube_model_id,
+                    material_id: wood_material_id,
+                    shader_id: light_shader_id,
+                    transform: Mat4f::translate(7.0, i as f32, -17.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW,
+                },
+            );
+        }
+
+        for i in 1..6 {
+            let block = self.world.create_entity();
+            _ = self.world.set_component(&block, components::Block {});
+            _ = self.world.set_component(
+                &block,
+                components::Renderable {
+                    mesh_id: cube_model_id,
+                    material_id: wood_material_id,
+                    shader_id: light_shader_id,
+                    transform: Mat4f::translate(24.0, i as f32, -20.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW,
+                },
+            );
+        }
+
+        for i in 1..6 {
+            let block = self.world.create_entity();
+            _ = self.world.set_component(&block, components::Block {});
+            _ = self.world.set_component(
+                &block,
+                components::Renderable {
+                    mesh_id: cube_model_id,
+                    material_id: wood_material_id,
+                    shader_id: light_shader_id,
+                    transform: Mat4f::translate(24.0, i as f32, -8.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW,
+                },
+            );
+        }
+
+        for i in 1..6 {
+            let block = self.world.create_entity();
+            _ = self.world.set_component(&block, components::Block {});
+            _ = self.world.set_component(
+                &block,
+                components::Renderable {
+                    mesh_id: cube_model_id,
+                    material_id: wood_material_id,
+                    shader_id: light_shader_id,
+                    transform: Mat4f::translate(15.0, i as f32, 0.0),
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW,
+                },
+            );
+        }
+
+        let sphere = self.world.create_entity();
+        _ = self.world.set_component(
+            &sphere,
+            components::Renderable {
+                mesh_id: sphere_model_id,
+                material_id: ground_material_id,
+                shader_id: light_shader_id,
+                transform: Mat4f::translate(10.0, 3.0, -10.0) ,
+                pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW | pipeline_stages::STAGE_DEBUG ,
+            },
+        );
+
         let lamp = self.world.create_entity();
-        _ = self.world.set_component(&lamp, components::LightBlock {});
+        _ = self.world.set_component(
+            &lamp,
+            // components::PointLightBlock {
+            //     attenuation: Vec3f::new(0.0028, 0.027, 1.0),
+            // },
+            components::DirLightBlock {
+                direction: Vec3f::new(-0.5, 0.33, 0.5),
+            },
+        );
         _ = self.world.set_component(
             &lamp,
             components::Renderable {
                 mesh_id: cube_model_id,
                 material_id: lamp_material_id,
                 shader_id: basic_shader_id,
-                transform: Mat4f::translate(20.0, 4.0, -16.0),
+                transform: Mat4f::translate(0.0, 16.0, 0.0),
                 pipeline_stages: pipeline_stages::STAGE_SCENE,
             },
         );
 
         // let lamp = self.world.create_entity();
-        // _ = self.world.set_component(&lamp, components::LightBlock {});
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::PointLightBlock {
+        //         attenuation: Vec3f::new(0.0075, 0.045, 1.0),
+        //     },
+        // );
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::Renderable {
+        //         mesh_id: cube_model_id,
+        //         material_id: lamp_material_id,
+        //         shader_id: basic_shader_id,
+        //         transform: Mat4f::translate(24.0, 6.0, -16.0),
+        //         pipeline_stages: pipeline_stages::STAGE_SCENE,
+        //     },
+        // );
+
+        // let lamp = self.world.create_entity();
+        // _ = self.world.set_component(
+        //     &lamp,
+        //     components::SpotLightBlock {
+        //         attenuation: Vec3f::new(0.017, 0.07, 1.0),
+        //         inner_cutoff_cos: 15f32.to_radians().cos(),
+        //         outer_cutoff_cos: 55f32.to_radians().cos(),
+        //         direction: Vec3f::new(-0.69, 0.23, -0.69),
+        //     },
+        // );
         // _ = self.world.set_component(
         //     &lamp,
         //     components::Renderable {
@@ -321,28 +518,23 @@ impl<'a> Engine<'a> {
         // );
 
         // let lamp = self.world.create_entity();
-        // _ = self.world.set_component(&lamp, components::LightBlock {});
         // _ = self.world.set_component(
         //     &lamp,
-        //     components::Renderable {
-        //         mesh_id: cube_model_id,
-        //         material_id: lamp_material_id,
-        //         shader_id: basic_shader_id,
-        //         transform: Mat4f::translate(20.0, 4.0, 0.0),
-        //         pipeline_stages: pipeline_stages::STAGE_SCENE,
+        //     components::SpotLightBlock {
+        //         attenuation: Vec3f::new(0.017, 0.07, 1.0),
+        //         inner_cutoff_cos: 15f32.to_radians().cos(),
+        //         outer_cutoff_cos: 55f32.to_radians().cos(),
+        //         direction: Vec3f::new(-0.69, 0.23, 0.69),
         //     },
         // );
-
-        // let lamp = self.world.create_entity();
-        // _ = self.world.set_component(&lamp, components::LightBlock {});
         // _ = self.world.set_component(
         //     &lamp,
         //     components::Renderable {
         //         mesh_id: cube_model_id,
         //         material_id: lamp_material_id,
         //         shader_id: basic_shader_id,
-        //         transform: Mat4f::translate(4.0, 4.0, 0.0),
-        //         pipeline_stages: pipeline_stages::STAGE_SCENE ,
+        //         transform: Mat4f::translate(4.0, 4.0, -5.0),
+        //         pipeline_stages: pipeline_stages::STAGE_SCENE,
         //     },
         // );
 
@@ -373,28 +565,72 @@ impl<'a> Engine<'a> {
     fn draw(&mut self) {
         self.renderer.begin();
 
-        for (_light_block, renderable) in self
+        for (spot_light, renderable) in self
             .world
             .get_current_view_mut()
-            .iter_two_components_mut::<components::LightBlock, components::Renderable>()
+            .iter_two_components_mut::<components::SpotLightBlock, components::Renderable>()
             .unwrap()
         {
-            self.renderer.add_light(Light {
-                ambient_col: Vec3f::new(0.91, 0.65, 0.36),
-                ambient_strength: 0.15,
-                diffuse_col: Vec3f::new(0.91, 0.65, 0.36),
-                diffuse_strength: 1.5,
-                specular_col: Vec3f::new(0.5, 0.5, 0.5),
-                specular_strength: 0.5,
-                quadratic: 0.00075,
-                linear: 0.0045,
-                constant: 1.0,
+            self.renderer.add_spot_light(SpotLight {
+                ambient_col: Vec3f::new(0.91, 0.65, 0.36) * 0.15,
+                diffuse_col: Vec3f::new(0.91, 0.65, 0.36) * 1.5,
+                specular_col: Vec3f::new(0.5, 0.5, 0.5) * 0.15,
+
+                attenuation: spot_light.attenuation,
+
+                inner_cutoff: spot_light.inner_cutoff_cos,
+                outer_cutoff: spot_light.outer_cutoff_cos,
+
                 position: Vec3f::new(
                     renderable.transform[(0, 3)],
                     renderable.transform[(1, 3)],
                     renderable.transform[(2, 3)],
                 ),
-                direction: Vec3f::new(0.69, 0.23, -0.69),
+                direction: spot_light.direction,
+                ..Default::default()
+            })
+        }
+
+        for (point_light, renderable) in self
+            .world
+            .get_current_view_mut()
+            .iter_two_components_mut::<components::PointLightBlock, components::Renderable>()
+            .unwrap()
+        {
+            self.renderer.add_point_light(PointLight {
+                ambient_col: Vec3f::new(0.91, 0.65, 0.36) * 0.15,
+                diffuse_col: Vec3f::new(0.91, 0.65, 0.36) * 1.5,
+                specular_col: Vec3f::new(0.5, 0.5, 0.5) * 0.15,
+
+                attenuation: point_light.attenuation,
+
+                position: Vec3f::new(
+                    renderable.transform[(0, 3)],
+                    renderable.transform[(1, 3)],
+                    renderable.transform[(2, 3)],
+                ),
+                ..Default::default()
+            })
+        }
+
+        for (dir_light, renderable) in self
+            .world
+            .get_current_view_mut()
+            .iter_two_components_mut::<components::DirLightBlock, components::Renderable>()
+            .unwrap()
+        {
+            self.renderer.set_directional_light(DirectionalLight {
+                ambient_col: Vec3f::new(0.91, 0.65, 0.36) * 0.15,
+                diffuse_col: Vec3f::new(0.91, 0.65, 0.36) ,
+                specular_col: Vec3f::new(0.5, 0.5, 0.5) * 0.15,
+
+                position: Vec3f::new(
+                    renderable.transform[(0, 3)],
+                    renderable.transform[(1, 3)],
+                    renderable.transform[(2, 3)],
+                ),
+                direction: dir_light.direction,
+
                 ..Default::default()
             })
         }

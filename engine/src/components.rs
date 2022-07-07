@@ -14,4 +14,21 @@ pub struct Renderable {
 
 pub struct Block {}
 
-pub struct LightBlock {}
+pub struct PointLightBlock {
+    // quadratic, linear, constant
+    pub attenuation: Vec3f,
+}
+
+pub struct SpotLightBlock {
+    // quadratic, linear, constant
+    pub attenuation: Vec3f,
+
+    pub inner_cutoff_cos: f32, // cosine value
+    pub outer_cutoff_cos: f32, // cosine value
+
+    pub direction: Vec3f,
+}
+
+pub struct DirLightBlock {
+    pub direction: Vec3f,
+}

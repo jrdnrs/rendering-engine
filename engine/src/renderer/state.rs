@@ -2,6 +2,10 @@ use glow::{self as gl, HasContext};
 
 use crate::{
     math::*,
+    memory_manager::{
+        memory_manager::MemoryManager,
+        uniform_layouts::{DirectionalLight, PointLight, SpotLight},
+    },
     resource_manager::resource_manager::{
         FramebufferID, ResourceIDTrait, ResourceManagerTrait, ResourcesManager, ShaderProgramID,
     },
@@ -54,7 +58,12 @@ pub struct RendererState<'a> {
     pub camera_position: Vec3f,
     pub camera_direction: Vec3f,
 
-    pub lights: Vec<Light>,
+    pub point_lights: Vec<PointLight>,
+    pub spot_lights: Vec<SpotLight>,
+    pub directional_light: Option<DirectionalLight>,
+
+    pub light_ortho_projection: Mat4f,
+    pub light_persp_projection: Mat4f,
 
     pub rasteriser_state: RasteriserState,
 }
@@ -71,7 +80,13 @@ impl<'a> RendererState<'a> {
             projection_transform: Mat4f::identity(),
             camera_position: Vec3f::new(0.0, 0.0, 0.0),
             camera_direction: Vec3f::new(0.0, 0.0, 0.0),
-            lights: Vec::new(),
+
+            point_lights: Vec::new(),
+            spot_lights: Vec::new(),
+            directional_light: None,
+
+            light_ortho_projection: Mat4f::identity(),
+            light_persp_projection: Mat4f::identity(),
 
             rasteriser_state: RasteriserState::default(),
         };
@@ -145,8 +160,24 @@ impl<'a> RendererState<'a> {
     }
 
     pub fn upload_light_data(&self, memory_manager: &mut MemoryManager) {
-        memory_manager.set_lights_data(&self.lights);
-        memory_manager.set_light_count(self.lights.len() as u32);
+        memory_manager.set_point_light_data_slice(&self.point_lights);
+        memory_manager.set_point_light_count(self.point_lights.len() as u32);
+
+        memory_manager.set_spot_light_data_slice(&self.spot_lights);
+        memory_manager.set_spot_light_count(self.spot_lights.len() as u32);
+
+        if let Some(directional_light) = self.directional_light {
+            memory_manager.set_directional_light_data(directional_light);
+            memory_manager.set_directional_light_count(1);
+        } else {
+            memory_manager.set_directional_light_count(0);
+        }
+    }
+
+    pub fn reset_lights(&mut self) {
+        self.point_lights.clear();
+        self.spot_lights.clear();
+        self.directional_light = None;
     }
 
     pub fn set_rasteriser_state(&mut self, state: RasteriserState) {

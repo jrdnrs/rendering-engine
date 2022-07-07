@@ -2,11 +2,27 @@ use glow::{self as gl, HasContext};
 
 #[derive(Clone)]
 pub enum FramebufferAttachment {
-    Renderbuffer { internal_format: u32 },
-    Texture { internal_format: u32 },
+    Renderbuffer {
+        internal_format: u32,
+    },
+    Texture {
+        target: TextureType,
+        internal_format: u32,
+        layers: u32,
+        levels: u32,
+    },
     None,
 }
 
+#[derive(Clone)]
+pub enum TextureType {
+    T2D,
+    T2DArray,
+    T3D,
+    CubeMap,
+}
+
+#[derive(Clone)]
 pub enum FramebufferAttachmentHandle {
     Renderbuffer(gl::Renderbuffer),
     Texture(gl::Texture),
@@ -33,6 +49,30 @@ impl Default for FramebufferConfig {
             width: crate::WIDTH,
             height: crate::HEIGHT,
             samples: 1,
+        }
+    }
+}
+
+fn get_gl_texture_type(t_type: &TextureType, multisample: bool) -> Result<u32, String> {
+    if multisample {
+        match t_type {
+            TextureType::T2D => Ok(gl::TEXTURE_2D_MULTISAMPLE),
+            TextureType::T2DArray => {
+                Err("Cannot create multisampled array texture for framebuffer".to_string())
+            }
+            TextureType::T3D => {
+                Err("Cannot create multisampled 3D texture for framebuffer".to_string())
+            }
+            TextureType::CubeMap => {
+                Err("Cannot create multisampled Cubemap texture for framebuffer".to_string())
+            }
+        }
+    } else {
+        match t_type {
+            TextureType::T2D => Ok(gl::TEXTURE_2D),
+            TextureType::T2DArray => Ok(gl::TEXTURE_2D_ARRAY),
+            TextureType::T3D => Ok(gl::TEXTURE_3D),
+            TextureType::CubeMap => Ok(gl::TEXTURE_CUBE_MAP),
         }
     }
 }
@@ -70,13 +110,21 @@ impl<'a> Framebuffer<'a> {
                 config.width,
                 config.height,
             ),
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture(
                 gl,
+                target,
                 framebuffer,
                 gl::COLOR_ATTACHMENT0,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
             ),
             FramebufferAttachment::None => unsafe {
                 gl.named_framebuffer_draw_buffer(framebuffer, gl::NONE);
@@ -95,13 +143,21 @@ impl<'a> Framebuffer<'a> {
                 config.width,
                 config.height,
             ),
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture(
                 gl,
+                target,
                 framebuffer,
                 gl::DEPTH_ATTACHMENT,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
             ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
@@ -115,13 +171,21 @@ impl<'a> Framebuffer<'a> {
                 config.width,
                 config.height,
             ),
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture(
                 gl,
+                target,
                 framebuffer,
                 gl::STENCIL_ATTACHMENT,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
             ),
             FramebufferAttachment::None => FramebufferAttachmentHandle::None,
         };
@@ -153,8 +217,14 @@ impl<'a> Framebuffer<'a> {
                     config.samples,
                 )
             }
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture_multisample(
                 gl,
+                target,
                 framebuffer,
                 gl::COLOR_ATTACHMENT0,
                 internal_format,
@@ -182,8 +252,14 @@ impl<'a> Framebuffer<'a> {
                     config.samples,
                 )
             }
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture_multisample(
                 gl,
+                target,
                 framebuffer,
                 gl::DEPTH_ATTACHMENT,
                 internal_format,
@@ -206,8 +282,14 @@ impl<'a> Framebuffer<'a> {
                     config.samples,
                 )
             }
-            FramebufferAttachment::Texture { internal_format } => Self::create_texture_multisample(
+            FramebufferAttachment::Texture {
+                ref target,
+                internal_format,
+                layers,
+                levels,
+            } => Self::create_texture_multisample(
                 gl,
+                target,
                 framebuffer,
                 gl::STENCIL_ATTACHMENT,
                 internal_format,
@@ -273,20 +355,62 @@ impl<'a> Framebuffer<'a> {
 
     fn create_texture(
         gl: &gl::Context,
+        target: &TextureType,
         framebuffer: gl::Framebuffer,
         attachment_type: u32,
         internal_format: u32,
         width: u32,
         height: u32,
+        depth: u32,
+        levels: u32,
     ) -> FramebufferAttachmentHandle {
-        let texture = unsafe { gl.create_named_texture(gl::TEXTURE_2D).unwrap() };
+        let texture = unsafe {
+            gl.create_named_texture(get_gl_texture_type(target, false).unwrap())
+                .unwrap()
+        };
 
         unsafe {
-            gl.texture_storage_2d(texture, 1, internal_format, width as i32, height as i32);
-            gl.texture_parameter_i32(texture, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-            gl.texture_parameter_i32(texture, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+            match target {
+                TextureType::T2DArray => {
+                    gl.texture_storage_3d(
+                        texture,
+                        levels as i32,
+                        internal_format,
+                        width as i32,
+                        height as i32,
+                        depth as i32,
+                    );
+                }
+                _ => {
+                    gl.texture_storage_2d(
+                        texture,
+                        levels as i32,
+                        internal_format,
+                        width as i32,
+                        height as i32,
+                    );
+                }
+            }
+
+            if levels > 1 {
+                gl.texture_parameter_i32(
+                    texture,
+                    gl::TEXTURE_MIN_FILTER,
+                    gl::LINEAR_MIPMAP_LINEAR as i32,
+                );
+            } else {
+                gl.texture_parameter_i32(texture, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+            }
+            gl.texture_parameter_i32(texture, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
             gl.texture_parameter_i32(texture, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
             gl.texture_parameter_i32(texture, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+            gl.texture_parameter_i32(texture, gl::TEXTURE_WRAP_R, gl::CLAMP_TO_EDGE as i32);
+            gl.texture_parameter_i32(
+                texture,
+                gl::TEXTURE_COMPARE_MODE,
+                gl::COMPARE_REF_TO_TEXTURE as i32,
+            );
+            gl.texture_parameter_i32(texture, gl::TEXTURE_COMPARE_FUNC, gl::GREATER as i32);
             gl.named_framebuffer_texture(framebuffer, attachment_type, texture, 0);
         }
 
@@ -295,6 +419,7 @@ impl<'a> Framebuffer<'a> {
 
     fn create_texture_multisample(
         gl: &gl::Context,
+        target: &TextureType,
         framebuffer: gl::Framebuffer,
         attachment_type: u32,
         internal_format: u32,
@@ -302,7 +427,10 @@ impl<'a> Framebuffer<'a> {
         height: u32,
         samples: u32,
     ) -> FramebufferAttachmentHandle {
-        let texture = unsafe { gl.create_named_texture(gl::TEXTURE_2D_MULTISAMPLE).unwrap() };
+        let texture = unsafe {
+            gl.create_named_texture(get_gl_texture_type(target, true).unwrap())
+                .unwrap()
+        };
 
         unsafe {
             gl.texture_storage_2d_multisample(

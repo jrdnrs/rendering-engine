@@ -12,13 +12,13 @@ use super::{
 };
 use crate::{
     components::Renderable,
-    math::math::*,
+    math::*,
     memory_manager::{
         memory_manager::MemoryManager,
         uniform_layouts::{self, DirectionalLight, PointLight, SpotLight},
     },
     resource_manager::{
-        framebuffer::{Framebuffer, FramebufferAttachment, FramebufferConfig},
+        framebuffer::{Framebuffer, FramebufferAttachment, FramebufferConfig, TextureType},
         model,
         resource_manager::{
             MaterialID, MeshID, ResourceIDTrait, ResourcesManager, ShaderProgramID, TextureID,
@@ -59,15 +59,21 @@ impl<'a> Renderer<'a> {
 
         let config = FramebufferConfig {
             colour: FramebufferAttachment::Texture {
+                target: TextureType::T2D,
                 internal_format: gl::RGBA16F,
+                layers: 1,
+                levels: 5,
             },
-            depth: FramebufferAttachment::Renderbuffer {
-                internal_format: gl::DEPTH_COMPONENT,
+            depth: FramebufferAttachment::Texture {
+                target: TextureType::T2D,
+                internal_format: gl::DEPTH_COMPONENT32F,
+                layers: 1,
+                levels: 1,
             },
             stencil: FramebufferAttachment::None,
             width: crate::WIDTH,
             height: crate::HEIGHT,
-            samples: 4,
+            samples: crate::SAMPLES,
         };
 
         let fb_id = self.resources_manager.load_framebuffer(&config, true);

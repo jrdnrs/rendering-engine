@@ -30,10 +30,10 @@ impl DrawCommands {
         self.indices.sort_by_key(|k| self.renderable_keys[*k])
     }
 
-    pub fn update_keys(&mut self, renderables: &[Renderable]) {
+    pub fn update_keys(&mut self, renderables: &[Renderable], renderable_indices: &[usize]) {
         self.renderable_keys.clear();
-        for renderable in renderables {
-            self.renderable_keys.push((self.hash_fn)(renderable))
+        for index in renderable_indices {
+            self.renderable_keys.push((self.hash_fn)(&renderables[*index]))
         }
     }
 }

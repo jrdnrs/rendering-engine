@@ -9,7 +9,7 @@
 
 #define GROUP_WIDTH             16
 #define GROUP_COUNT             (GROUP_WIDTH * GROUP_WIDTH)
-#define SAMPLE_RADIUS           3
+#define SAMPLE_RADIUS           2
 #define GROUP_SAMPLES_WIDTH     (GROUP_WIDTH + (SAMPLE_RADIUS * 2))
 #define GROUP_SAMPLES_COUNT     (GROUP_SAMPLES_WIDTH * GROUP_SAMPLES_WIDTH)
 

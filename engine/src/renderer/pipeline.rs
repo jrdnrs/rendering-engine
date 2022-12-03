@@ -50,10 +50,10 @@ impl<'a> RendererPipeline<'a> {
         self.enabled & mask == mask
     }
 
-    pub fn submit(&mut self, renderable: &Renderable) {
+    pub fn submit(&mut self, renderable_index: usize, pipeline_stages: u16) {
         for (id, stage) in self.stages.iter_mut() {
-            if *id & self.enabled > 0 && *id & renderable.pipeline_stages == *id {
-                stage.submit(renderable)
+            if *id & self.enabled > 0 && *id & pipeline_stages == *id {
+                stage.submit(renderable_index)
             }
         }
     }
@@ -63,12 +63,13 @@ impl<'a> RendererPipeline<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        renderables: &[Renderable]
     ) {
         for stage_id in STAGES {
             if stage_id & self.enabled > 0 {
                 if let Some(stage) = self.stages.get_mut(stage_id) {
                     renderer_state.set_framebuffer(Some(&stage.get_target()), resources_manager);
-                    stage.execute(memory_manager, resources_manager, renderer_state);
+                    stage.execute(memory_manager, resources_manager, renderer_state, renderables);
                     renderer_state.set_rasteriser_state(RasteriserState::default());
                 }
             }

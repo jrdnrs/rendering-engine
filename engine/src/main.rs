@@ -17,7 +17,7 @@ use engine::Engine;
 
 const FPS: f32 = 30.0;
 const VSYNC: bool = true;
-const SAMPLES: u16 = 4;
+const SAMPLES: u32 = 1;
 const WIDTH: u32 = 1600;
 const HEIGHT: u32 = 900;
 

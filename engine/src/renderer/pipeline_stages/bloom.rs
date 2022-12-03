@@ -57,13 +57,14 @@ impl<'a> PipelineStage for BloomStage<'a> {
     ) {
     }
 
-    fn submit(&mut self, renderable: &Renderable) {}
+    fn submit(&mut self, renderable_index: usize) {}
 
     fn execute(
         &mut self,
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        renderables: &[Renderable],
     ) {
         let fb = resources_manager.borrow_framebuffer(&self.target).unwrap();
         let texture = fb.get_colour_texture_handle().unwrap();

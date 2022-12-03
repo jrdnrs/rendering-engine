@@ -46,7 +46,7 @@ impl<'a> Engine<'a> {
 
     fn process_input(&mut self) {
         let delta_time = self.context.last_frame_delta.as_secs_f32();
-        let sensitivity = 40.0 * delta_time;
+        let sensitivity = 10.0 * delta_time;
         let move_speed = 5.0 * delta_time;
 
         if self.input.is_key_down(VirtualKeyCode::Escape) {
@@ -117,12 +117,20 @@ impl<'a> Engine<'a> {
             }
 
             if self.input.is_key_down(VirtualKeyCode::F3) {
-                if self.renderer.renderer_pipeline.is_enabled(pipeline_stages::STAGE_DEBUG) {
+                if self
+                    .renderer
+                    .renderer_pipeline
+                    .is_enabled(pipeline_stages::STAGE_DEBUG)
+                {
                     debug!("Debug render stage: OFF");
-                    self.renderer.renderer_pipeline.disable_stages(pipeline_stages::STAGE_DEBUG)
+                    self.renderer
+                        .renderer_pipeline
+                        .disable_stages(pipeline_stages::STAGE_DEBUG)
                 } else {
                     debug!("Debug render stage: ON");
-                    self.renderer.renderer_pipeline.enable_stages(pipeline_stages::STAGE_DEBUG)
+                    self.renderer
+                        .renderer_pipeline
+                        .enable_stages(pipeline_stages::STAGE_DEBUG)
                 }
             }
 
@@ -137,7 +145,7 @@ impl<'a> Engine<'a> {
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
                     .normalise()
-                     * move_speed;
+                    * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::S) {
@@ -151,7 +159,7 @@ impl<'a> Engine<'a> {
                     .direction
                     .cross(Vec3f::new(0.0, 1.0, 0.0))
                     .normalise()
-                     * move_speed;
+                    * move_speed;
             }
 
             if self.input.is_key_down(VirtualKeyCode::Space) {
@@ -385,7 +393,7 @@ impl<'a> Engine<'a> {
                     material_id: wood_material_id,
                     shader_id: light_shader_id,
                     transform: Mat4f::translate(3.0, i as f32, -5.0),
-                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW ,
+                    pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW,
                 },
             );
         }
@@ -457,8 +465,10 @@ impl<'a> Engine<'a> {
                 mesh_id: sphere_model_id,
                 material_id: ground_material_id,
                 shader_id: light_shader_id,
-                transform: Mat4f::translate(10.0, 3.0, -10.0) ,
-                pipeline_stages: pipeline_stages::STAGE_SCENE | pipeline_stages::STAGE_SHADOW | pipeline_stages::STAGE_DEBUG ,
+                transform: Mat4f::translate(10.0, 3.0, -10.0),
+                pipeline_stages: pipeline_stages::STAGE_SCENE
+                    | pipeline_stages::STAGE_SHADOW
+                    | pipeline_stages::STAGE_DEBUG,
             },
         );
 
@@ -564,6 +574,8 @@ impl<'a> Engine<'a> {
         self.process_input();
         self.draw();
         self.input.mouse.moved = false;
+        self.input.mouse.delta_x = 0.0;
+        self.input.mouse.delta_y = 0.0;
         self.context.frames += 1;
     }
 
@@ -626,7 +638,7 @@ impl<'a> Engine<'a> {
         {
             self.renderer.set_directional_light(DirectionalLight {
                 ambient_col: Vec3f::new(0.91, 0.65, 0.36) * 0.15,
-                diffuse_col: Vec3f::new(0.91, 0.65, 0.36) ,
+                diffuse_col: Vec3f::new(0.91, 0.65, 0.36),
                 specular_col: Vec3f::new(0.5, 0.5, 0.5) * 0.15,
 
                 position: Vec3f::new(
@@ -673,8 +685,8 @@ impl<'a> Engine<'a> {
                 }
                 Event::DeviceEvent { event, .. } => match event {
                     DeviceEvent::MouseMotion { delta } => {
-                        self.input.mouse.delta_x = delta.0;
-                        self.input.mouse.delta_y = delta.1;
+                        self.input.mouse.delta_x += delta.0;
+                        self.input.mouse.delta_y += delta.1;
                         self.input.mouse.moved = true;
                     }
                     _ => (),

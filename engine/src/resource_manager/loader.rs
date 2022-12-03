@@ -41,6 +41,8 @@ impl Mesh {
         {
             m.vertices.extend_from_slice(pos);
             m.vertices.extend_from_slice(normal);
+            // calc tangent
+            m.vertices.extend_from_slice(&[1.0, 1.0, 1.0, 1.0]); // colour
             m.vertices.extend_from_slice(tex_coord);
         }
 

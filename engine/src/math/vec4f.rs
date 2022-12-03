@@ -1,5 +1,3 @@
-use super::{vec3f::Vec3f, Mat4f};
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Vec4f {

@@ -23,7 +23,7 @@ pub struct DebugStage<'a> {
     target: FramebufferID,
     wireframe_shader_id: ShaderProgramID,
     vertices_shader_id: ShaderProgramID,
-    renderables: Vec<Renderable>,
+    renderable_indices: Vec<usize>,
     command_queue: DrawCommands,
     pending_indirect_command_count: u32,
 }
@@ -40,7 +40,7 @@ impl<'a> DebugStage<'a> {
         Self {
             gl,
             target,
-            renderables: Vec::new(),
+            renderable_indices: Vec::new(),
             command_queue: DrawCommands::new(hash),
             pending_indirect_command_count: 0,
             wireframe_shader_id,
@@ -62,8 +62,8 @@ impl<'a> PipelineStage for DebugStage<'a> {
     ) {
     }
 
-    fn submit(&mut self, renderable: &Renderable) {
-        self.renderables.push(renderable.clone());
+    fn submit(&mut self, renderable_index: usize) {
+        self.renderable_indices.push(renderable_index);
     }
 
     fn execute(
@@ -71,20 +71,21 @@ impl<'a> PipelineStage for DebugStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        renderables: &[Renderable]
     ) {
-        self.command_queue.update_keys(&self.renderables);
+        self.command_queue.update_keys(renderables, &self.renderable_indices);
         self.command_queue.sort_indices();
 
         // HACK: added a dummy renderable to the end to otherwise the last renderable would be cut off
         // when iterating through renderables with renderable and next_renderable. zip stops when one returns None
-        self.renderables.push(Renderable {
-            mesh_id: MeshID::new(0xFFFF),
-            material_id: MaterialID::new(0xFFFF),
-            shader_id: ShaderProgramID::new(0xFFFF),
-            transform: Mat4f::identity(),
-            pipeline_stages: 0,
-        });
-        self.command_queue.indices.push(self.renderables.len() - 1);
+        // self.renderables.push(Renderable {
+        //     mesh_id: MeshID::new(0xFFFF),
+        //     material_id: MaterialID::new(0xFFFF),
+        //     shader_id: ShaderProgramID::new(0xFFFF),
+        //     transform: Mat4f::identity(),
+        //     pipeline_stages: 0,
+        // });
+        // self.command_queue.indices.push(self.renderables.len() - 1);
 
         let mut instance_count = 0;
 
@@ -95,8 +96,8 @@ impl<'a> PipelineStage for DebugStage<'a> {
             .zip(self.command_queue.indices[1..].iter())
             .enumerate()
         {
-            let renderable = &self.renderables[*index];
-            let next_renderable = &self.renderables[*next_index];
+            let renderable = &renderables[self.renderable_indices[*index]];
+            let next_renderable = &renderables[self.renderable_indices[*next_index]];
 
             instance_count += 1;
 
@@ -113,7 +114,7 @@ impl<'a> PipelineStage for DebugStage<'a> {
                 for instance_index in
                     self.command_queue.indices[(i - (instance_count - 1) as usize)..(i + 1)].iter()
                 {
-                    let renderable = &self.renderables[*instance_index];
+                    let renderable = &renderables[self.renderable_indices[*instance_index]];
 
                     memory_manager.push_instance_data(&InstanceData {
                         material_index: renderable.material_id.index(),
@@ -149,7 +150,7 @@ impl<'a> PipelineStage for DebugStage<'a> {
         );
 
         self.pending_indirect_command_count = 0;
-        self.renderables.clear();
+        self.renderable_indices.clear();
     }
 }
 

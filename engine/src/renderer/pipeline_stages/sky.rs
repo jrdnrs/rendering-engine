@@ -13,7 +13,7 @@ use crate::{
 pub struct SkyStage<'a> {
     gl: &'a gl::Context,
     target: FramebufferID,
-    skybox: Option<Renderable>,
+    skybox: Option<usize>,
 }
 
 impl<'a> SkyStage<'a> {
@@ -39,8 +39,8 @@ impl<'a> PipelineStage for SkyStage<'a> {
     ) {
     }
 
-    fn submit(&mut self, skybox: &Renderable) {
-        self.skybox = Some(skybox.clone())
+    fn submit(&mut self, renderable_index: usize) {
+        self.skybox = Some(renderable_index)
     }
 
     fn execute(
@@ -48,8 +48,11 @@ impl<'a> PipelineStage for SkyStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        renderables: &[Renderable]
     ) {
-        if let Some(skybox) = &self.skybox {
+        if let Some(skybox_index) = &self.skybox {
+            let skybox = &renderables[*skybox_index];
+
             renderer_state.set_rasteriser_state(RasteriserState {
                 depth_func: gl::LEQUAL,
                 cull_face: gl::FRONT,

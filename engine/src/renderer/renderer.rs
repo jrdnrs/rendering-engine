@@ -34,6 +34,8 @@ pub struct Renderer<'a> {
     pub renderer_state: RendererState<'a>,
     pub renderer_pipeline: RendererPipeline<'a>,
     pub camera: Camera,
+
+    renderables: Vec<Renderable>,
 }
 
 impl<'a> Renderer<'a> {
@@ -45,6 +47,7 @@ impl<'a> Renderer<'a> {
             renderer_state: RendererState::new(gl),
             renderer_pipeline: RendererPipeline::new(gl),
             camera: Camera::new_perspective(70.0, 0.1, 100.0),
+            renderables: Vec::new()
         };
         r.init();
         r
@@ -195,7 +198,6 @@ impl<'a> Renderer<'a> {
         self.renderer_state.projection_transform = self.camera.projection.clone();
         self.renderer_state.camera_position = self.camera.position;
         self.renderer_state.camera_direction = self.camera.direction;
-        self.memory_manager.wait_for_section_lock();
     }
 
     pub fn end(&mut self) {
@@ -208,15 +210,18 @@ impl<'a> Renderer<'a> {
             &mut self.memory_manager,
             &mut self.resources_manager,
             &mut self.renderer_state,
+            &self.renderables,
         );
         self.memory_manager.set_section_lock();
 
         self.memory_manager.advance_sections();
         self.renderer_state.reset_lights();
+        self.renderables.clear();
     }
 
     pub fn draw(&mut self, renderable: &Renderable) {
-        self.renderer_pipeline.submit(renderable)
+        self.renderables.push(renderable.clone());
+        self.renderer_pipeline.submit(self.renderables.len()-1, renderable.pipeline_stages);
     }
 
     pub fn load_shader(&mut self, path: &'static str) -> ShaderProgramID {

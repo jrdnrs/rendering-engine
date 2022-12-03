@@ -3,19 +3,20 @@
 mod components;
 mod context;
 mod engine;
+mod graphics;
 mod input;
 mod math;
 mod memory_manager;
 mod renderer;
 mod resource_manager;
 mod util;
-mod graphics;
+mod platform;
 
 use colored::Colorize;
 use context::Context;
 use engine::Engine;
 
-const FPS: f32 = 30.0;
+const FPS: f32 = 60.0;
 const VSYNC: bool = true;
 const SAMPLES: u32 = 1;
 const WIDTH: u32 = 1600;

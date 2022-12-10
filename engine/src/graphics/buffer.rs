@@ -2,30 +2,20 @@
 pub use super::opengl::buffer::{BufferType, FenceHandle};
 use super::{shader::ShaderDataType, ApiHandle};
 
-// #[derive(Clone, Copy)]
-// pub enum BufferType {
-//     Vertex,
-//     Index,
-//     DrawIndirectCommand,
-//     ShaderStorage,
-//     Texture,
-//     Uniform,
-//     TransformFeedback,
-// }
 
 pub struct BufferElement {
     pub name: &'static str,
     pub data_type: ShaderDataType,
-    pub count: usize,
-    pub offset: usize,
+    pub count: u32,
+    pub offset: u32,
     pub normalised: bool,
 }
 
 pub struct BufferLayout {
     pub elements: Vec<BufferElement>,
-    pub stride: usize,
-    pub buffer_size: usize,
-    pub divisor: usize,
+    pub stride: u32,
+    pub buffer_size: u32,
+    pub divisor: u32,
 }
 
 pub struct VertexArray {
@@ -41,18 +31,18 @@ pub struct BufferStorage {
     pub buffer_lock_man: BufferLockManager,
     pub buffer_base_pointer: *mut u8,
 
-    pub buffer_section_offset: usize, // offset in entire buffer to the current section
+    pub buffer_section_offset: u32, // offset in entire buffer to the current section
 
-    pub sections: usize,
-    pub section_size_bytes: usize,
-    pub current_section: usize,
-    pub section_buffer_index: usize, // index into current section, not entire buffer
+    pub sections: u32,
+    pub section_size_bytes: u32,
+    pub current_section: u32,
+    pub section_buffer_index: u32, // index into current section, not entire buffer
 }
 
 pub struct BufferLock {
     pub fence_handle: FenceHandle,
-    pub start: usize,
-    pub length: usize,
+    pub start: u32,
+    pub length: u32,
 }
 
 pub struct BufferLockManager {

@@ -1,49 +1,6 @@
 #[cfg(feature = "opengl")]
-pub use super::opengl::texture::{ImageDataType, ImageFormat, TextureFilter, TextureWrap};
-use super::{ApiEnum, ApiHandle};
-
-#[derive(Clone, Copy)]
-pub enum TextureType {
-    T2D,
-    T2DArray,
-    T3D,
-    CubeMap,
-}
-
-// #[derive(Clone, Copy)]
-// pub enum TextureFilter {
-//     Nearest,
-//     Linear,
-// }
-
-// #[derive(Clone, Copy)]
-// pub enum TextureWrap {
-//     ClampToEdge,
-//     ClampToBorder,
-//     Repeat,
-//     MirrorRepeat,
-//     MirrorClampToEdge,
-// }
-
-// #[derive(Clone, Copy)]
-// pub enum ImageDataType {
-//     UnsignedByte,
-//     UnsignedShort,
-//     Float,
-//     NA,
-// }
-
-// #[derive(Clone, Copy)]
-// pub enum ImageFormat {
-//     RGB,
-//     RGBA,
-//     Bc6hTypeless,
-//     Bc6hUnsignedFloat16,
-//     Bc6hSignedFloat16,
-//     Bc7Typeless,
-//     Bc7UnsignedNormalised,
-//     Bc7UnsignedNormalisedSrgb,
-// }
+pub use super::opengl::texture::{ImageFormat, TextureFilter, TextureWrap, TextureType};
+use super::{opengl::framebuffer::InternalFormat, ApiEnum, ApiHandle, DataType};
 
 #[derive(Clone)]
 pub struct TextureConfig {
@@ -69,21 +26,38 @@ impl Default for TextureConfig {
 pub struct Texture {
     pub config: TextureConfig,
     pub handle: ApiHandle,
+    pub shader_texture_handle: Option<u64>,
+    pub resident: bool,
     pub target: ApiEnum,
-    pub internal_format: ApiEnum,
-    pub format: ApiEnum,
-    pub data_type: ApiEnum,
-    pub width: usize,
-    pub height: usize,
+    pub internal_format: InternalFormat,
+    pub format: ImageFormat,
+    pub data_type: DataType,
+    pub width: u32,
+    pub height: u32,
 }
 
 pub struct Image {
     pub path: &'static str,
     pub format: ImageFormat,
-    pub data_type: ImageDataType,
+    pub data_type: DataType,
     pub compressed: bool,
-    pub mipmap_count: usize,
-    pub width: usize,
-    pub height: usize,
+    pub mipmap_count: u32,
+    pub width: u32,
+    pub height: u32,
     pub bytes: Vec<u8>,
+}
+
+impl Default for Image {
+    fn default() -> Self {
+        Self {
+            path: Default::default(),
+            format: ImageFormat::RGBA,
+            data_type: DataType::Float32,
+            compressed: Default::default(),
+            mipmap_count: Default::default(),
+            width: Default::default(),
+            height: Default::default(),
+            bytes: Default::default(),
+        }
+    }
 }

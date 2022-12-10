@@ -1,5 +1,10 @@
+use super::texture::{TextureFilter, TextureWrap, TextureType};
 use crate::{
-    graphics::{framebuffer::*, graphics::ApiEnum, texture::TextureType},
+    graphics::{
+        framebuffer::*,
+        graphics::ApiEnum,
+        texture::{Texture, TextureConfig},
+    },
     platform::rustgl as gl,
 };
 
@@ -29,52 +34,44 @@ pub enum InternalFormat {
     R16 = gl::R16 as isize,
     R16F = gl::R16F as isize,
     R32F = gl::R32F as isize,
-}
-
-fn get_gl_texture_type(t_type: &TextureType, multisample: bool) -> Result<u32, String> {
-    if multisample {
-        match t_type {
-            TextureType::T2D => Ok(gl::TEXTURE_2D_MULTISAMPLE),
-            TextureType::T2DArray => {
-                Err("Cannot create multisampled array texture for framebuffer".to_string())
-            }
-            TextureType::T3D => {
-                Err("Cannot create multisampled 3D texture for framebuffer".to_string())
-            }
-            TextureType::CubeMap => {
-                Err("Cannot create multisampled Cubemap texture for framebuffer".to_string())
-            }
-        }
-    } else {
-        match t_type {
-            TextureType::T2D => Ok(gl::TEXTURE_2D),
-            TextureType::T2DArray => Ok(gl::TEXTURE_2D_ARRAY),
-            TextureType::T3D => Ok(gl::TEXTURE_3D),
-            TextureType::CubeMap => Ok(gl::TEXTURE_CUBE_MAP),
-        }
-    }
+    SRGB8 = gl::SRGB8 as isize,
+    SRGB8A8 = gl::SRGB8_ALPHA8 as isize,
+    Bc6hUnsigned16F = gl::COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT as isize,
+    Bc6hSigned16F = gl::COMPRESSED_RGB_BPTC_SIGNED_FLOAT as isize,
+    Bc7UnsignedNormalised = gl::COMPRESSED_RGBA_BPTC_UNORM as isize,
+    Bc7UnsignedNormalisedSRGB = gl::COMPRESSED_SRGB_ALPHA_BPTC_UNORM as isize,
 }
 
 impl Framebuffer {
-    pub fn new_monosample(&self, config: &FramebufferConfig) -> Framebuffer {
+    pub fn new(config: &FramebufferConfig) -> Framebuffer {
+        if config.samples > 1 {
+            Self::new_multisample(config)
+        } else {
+            Self::new_monosample(config)
+        }
+    }
+
+    pub fn new_monosample(config: &FramebufferConfig) -> Framebuffer {
         let config = config.clone();
 
         let framebuffer = unsafe { gl::create_named_framebuffer().unwrap() };
 
         let colour_handle = match config.colour {
-            FramebufferAttachment::Renderbuffer { internal_format } => self.create_renderbuffer(
-                framebuffer,
-                gl::COLOR_ATTACHMENT0,
-                internal_format,
-                config.width,
-                config.height,
-            ),
-            FramebufferAttachment::Texture {
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer(
+                    framebuffer,
+                    gl::COLOR_ATTACHMENT0,
+                    internal_format,
+                    config.width,
+                    config.height,
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::COLOR_ATTACHMENT0,
@@ -83,29 +80,32 @@ impl Framebuffer {
                 config.height,
                 layers,
                 levels,
+                1,
             ),
-            FramebufferAttachment::None => unsafe {
+            FramebufferAttachmentConfig::None => unsafe {
                 gl::named_framebuffer_draw_buffer(framebuffer, gl::NONE);
                 gl::named_framebuffer_read_buffer(framebuffer, gl::NONE);
 
-                FramebufferAttachmentHandle::None
+                FramebufferAttachment::None
             },
         };
 
         let depth_handle = match config.depth {
-            FramebufferAttachment::Renderbuffer { internal_format } => self.create_renderbuffer(
-                framebuffer,
-                gl::DEPTH_ATTACHMENT,
-                internal_format,
-                config.width,
-                config.height,
-            ),
-            FramebufferAttachment::Texture {
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer(
+                    framebuffer,
+                    gl::DEPTH_ATTACHMENT,
+                    internal_format,
+                    config.width,
+                    config.height,
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::DEPTH_ATTACHMENT,
@@ -114,24 +114,27 @@ impl Framebuffer {
                 config.height,
                 layers,
                 levels,
+                1,
             ),
-            FramebufferAttachment::None => FramebufferAttachmentHandle::None,
+            FramebufferAttachmentConfig::None => FramebufferAttachment::None,
         };
 
         let stencil_handle = match config.stencil {
-            FramebufferAttachment::Renderbuffer { internal_format } => self.create_renderbuffer(
-                framebuffer,
-                gl::STENCIL_ATTACHMENT,
-                internal_format,
-                config.width,
-                config.height,
-            ),
-            FramebufferAttachment::Texture {
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer(
+                    framebuffer,
+                    gl::STENCIL_ATTACHMENT,
+                    internal_format,
+                    config.width,
+                    config.height,
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::STENCIL_ATTACHMENT,
@@ -140,8 +143,9 @@ impl Framebuffer {
                 config.height,
                 layers,
                 levels,
+                1,
             ),
-            FramebufferAttachment::None => FramebufferAttachmentHandle::None,
+            FramebufferAttachmentConfig::None => FramebufferAttachment::None,
         };
 
         Framebuffer {
@@ -153,95 +157,104 @@ impl Framebuffer {
         }
     }
 
-    pub fn new_multisample(&self, config: &FramebufferConfig) -> Framebuffer {
+    pub fn new_multisample(config: &FramebufferConfig) -> Framebuffer {
         let config = config.clone();
 
         let framebuffer = unsafe { gl::create_named_framebuffer().unwrap() };
 
         let colour_handle = match config.colour {
-            FramebufferAttachment::Renderbuffer { internal_format } => self
-                .create_renderbuffer_multisample(
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
                     framebuffer,
                     gl::COLOR_ATTACHMENT0,
                     internal_format,
                     config.width,
                     config.height,
                     config.samples,
-                ),
-            FramebufferAttachment::Texture {
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture_multisample(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::COLOR_ATTACHMENT0,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
                 config.samples,
             ),
-            FramebufferAttachment::None => unsafe {
+            FramebufferAttachmentConfig::None => unsafe {
                 gl::named_framebuffer_draw_buffer(framebuffer, gl::NONE);
                 gl::named_framebuffer_read_buffer(framebuffer, gl::NONE);
 
-                FramebufferAttachmentHandle::None
+                FramebufferAttachment::None
             },
         };
 
         let depth_handle = match config.depth {
-            FramebufferAttachment::Renderbuffer { internal_format } => self
-                .create_renderbuffer_multisample(
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
                     framebuffer,
                     gl::DEPTH_ATTACHMENT,
                     internal_format,
                     config.width,
                     config.height,
                     config.samples,
-                ),
-            FramebufferAttachment::Texture {
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture_multisample(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::DEPTH_ATTACHMENT,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
                 config.samples,
             ),
-            FramebufferAttachment::None => FramebufferAttachmentHandle::None,
+            FramebufferAttachmentConfig::None => FramebufferAttachment::None,
         };
 
         let stencil_handle = match config.stencil {
-            FramebufferAttachment::Renderbuffer { internal_format } => self
-                .create_renderbuffer_multisample(
+            FramebufferAttachmentConfig::Renderbuffer { internal_format } => {
+                Self::create_renderbuffer_multisample(
                     framebuffer,
                     gl::STENCIL_ATTACHMENT,
                     internal_format,
                     config.width,
                     config.height,
                     config.samples,
-                ),
-            FramebufferAttachment::Texture {
+                )
+            }
+            FramebufferAttachmentConfig::Texture {
                 ref target,
                 internal_format,
                 layers,
                 levels,
-            } => self.create_texture_multisample(
+            } => Self::create_texture(
                 target,
                 framebuffer,
                 gl::STENCIL_ATTACHMENT,
                 internal_format,
                 config.width,
                 config.height,
+                layers,
+                levels,
                 config.samples,
             ),
-            FramebufferAttachment::None => FramebufferAttachmentHandle::None,
+            FramebufferAttachmentConfig::None => FramebufferAttachment::None,
         };
 
         Framebuffer {
@@ -254,32 +267,35 @@ impl Framebuffer {
     }
 
     fn create_renderbuffer(
-        &self,
         framebuffer: gl::GlFramebuffer,
         attachment_type: ApiEnum,
         internal_format: InternalFormat,
-        width: usize,
-        height: usize,
-    ) -> FramebufferAttachmentHandle {
+        width: u32,
+        height: u32,
+    ) -> FramebufferAttachment {
         let rbo = unsafe { gl::create_named_renderbuffer().unwrap() };
 
         unsafe {
-            gl::named_renderbuffer_storage(rbo, internal_format as u32, width as i32, height as i32);
+            gl::named_renderbuffer_storage(
+                rbo,
+                internal_format as u32,
+                width as i32,
+                height as i32,
+            );
             gl::named_framebuffer_renderbuffer(framebuffer, attachment_type, gl::RENDERBUFFER, rbo);
         }
 
-        FramebufferAttachmentHandle::Renderbuffer(rbo.0)
+        FramebufferAttachment::Renderbuffer(rbo.0)
     }
 
     fn create_renderbuffer_multisample(
-        &self,
         framebuffer: gl::GlFramebuffer,
         attachment_type: ApiEnum,
         internal_format: InternalFormat,
-        width: usize,
-        height: usize,
-        samples: usize,
-    ) -> FramebufferAttachmentHandle {
+        width: u32,
+        height: u32,
+        samples: u32,
+    ) -> FramebufferAttachment {
         let rbo = unsafe { gl::create_named_renderbuffer().unwrap() };
 
         unsafe {
@@ -293,180 +309,147 @@ impl Framebuffer {
             gl::named_framebuffer_renderbuffer(framebuffer, attachment_type, gl::RENDERBUFFER, rbo);
         }
 
-        FramebufferAttachmentHandle::Renderbuffer(rbo.0)
+        FramebufferAttachment::Renderbuffer(rbo.0)
     }
 
     fn create_texture(
-        &self,
         target: &TextureType,
         framebuffer: gl::GlFramebuffer,
         attachment_type: ApiEnum,
         internal_format: InternalFormat,
-        width: usize,
-        height: usize,
-        depth: usize,
-        levels: usize,
-    ) -> FramebufferAttachmentHandle {
-        let texture = unsafe {
-            gl::create_named_texture(get_gl_texture_type(target, false).unwrap()).unwrap()
-        };
+        width: u32,
+        height: u32,
+        layers: u32,
+        levels: u32,
+        samples: u32,
+    ) -> FramebufferAttachment {
+        let texture = Texture::new_framebuffer_texture(
+            *target,
+            internal_format,
+            layers,
+            levels,
+            samples,
+            width,
+            height,
+            &TextureConfig {
+                wrap: TextureWrap::ClampToEdge,
+                min_filter: TextureFilter::Linear,
+                mag_filter: TextureFilter::Linear,
+                mipmap: levels > 1,
+                srgb: false,
+            },
+        );
 
         unsafe {
-            match target {
-                TextureType::T2DArray => {
-                    gl::texture_storage_3d(
-                        texture,
-                        levels as i32,
-                        internal_format as u32,
-                        width as i32,
-                        height as i32,
-                        depth as i32,
-                    );
-                }
-                _ => {
-                    gl::texture_storage_2d(
-                        texture,
-                        levels as i32,
-                        internal_format as u32,
-                        width as i32,
-                        height as i32,
-                    );
-                }
-            }
+            gl::named_framebuffer_texture(
+                framebuffer,
+                attachment_type,
+                gl::GlTexture(texture.handle),
+                0,
+            )
+        };
 
-            if levels > 1 {
-                gl::texture_parameter_i32(
-                    texture,
-                    gl::TEXTURE_MIN_FILTER,
-                    gl::LINEAR_MIPMAP_LINEAR as i32,
-                );
-            } else {
-                gl::texture_parameter_i32(texture, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-            }
-            gl::texture_parameter_i32(texture, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
-            gl::texture_parameter_i32(texture, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
-            gl::texture_parameter_i32(texture, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
-            gl::texture_parameter_i32(texture, gl::TEXTURE_WRAP_R, gl::CLAMP_TO_EDGE as i32);
-            gl::texture_parameter_i32(
-                texture,
-                gl::TEXTURE_COMPARE_MODE,
-                gl::COMPARE_REF_TO_TEXTURE as i32,
-            );
-            gl::texture_parameter_i32(texture, gl::TEXTURE_COMPARE_FUNC, gl::GREATER as i32);
-            gl::named_framebuffer_texture(framebuffer, attachment_type, texture, 0);
-        }
-
-        FramebufferAttachmentHandle::Texture(texture.0)
+        FramebufferAttachment::Texture(texture)
     }
 
-    fn create_texture_multisample(
+    pub fn blit_to_default_framebuffer(
         &self,
-        target: &TextureType,
-        framebuffer: gl::GlFramebuffer,
-        attachment_type: ApiEnum,
-        internal_format: InternalFormat,
-        width: usize,
-        height: usize,
-        samples: usize,
-    ) -> FramebufferAttachmentHandle {
-        let texture = unsafe {
-            gl::create_named_texture(get_gl_texture_type(target, true).unwrap()).unwrap()
-        };
-
+        src_x0: u32,
+        src_y0: u32,
+        src_x1: u32,
+        src_y1: u32,
+        dst_x0: u32,
+        dst_y0: u32,
+        dst_x1: u32,
+        dst_y1: u32,
+        filter: TextureFilter,
+    ) {
         unsafe {
-            gl::texture_storage_2d_multisample(
-                texture,
-                samples as i32,
-                internal_format as u32,
-                width as i32,
-                height as i32,
-                true,
-            );
-            gl::named_framebuffer_texture(framebuffer, attachment_type, texture, 0);
-        }
-
-        FramebufferAttachmentHandle::Texture(texture.0)
-    }
-
-    pub fn get_texture_handle(handle: &FramebufferAttachmentHandle) -> Option<gl::GlTexture> {
-        if let FramebufferAttachmentHandle::Texture(gl_handle) = handle {
-            Some(gl::GlTexture(*gl_handle))
-        } else {
-            None
+            gl::blit_to_default_framebuffer(
+                gl::GlFramebuffer(self.handle),
+                src_x0 as i32,
+                src_y0 as i32,
+                src_x1 as i32,
+                src_y1 as i32,
+                dst_x0 as i32,
+                dst_y0 as i32,
+                dst_x1 as i32,
+                dst_y1 as i32,
+                gl::COLOR_BUFFER_BIT,
+                filter as u32,
+            )
         }
     }
 
-    pub fn get_renderbuffer_handle(
-        handle: &FramebufferAttachmentHandle,
-    ) -> Option<gl::GlRenderbuffer> {
-        if let FramebufferAttachmentHandle::Texture(gl_handle) = handle {
-            Some(gl::GlRenderbuffer(*gl_handle))
-        } else {
-            None
-        }
-    }
-
-    pub fn resize(&self, framebuffer: &mut Framebuffer, width: usize, height: usize) {
-        framebuffer.config.width = width;
-        framebuffer.config.height = height;
-        let new = if framebuffer.config.samples > 1 {
-            self.new_multisample(&framebuffer.config)
-        } else {
-            self.new_monosample(&framebuffer.config)
-        };
-        self.delete(&framebuffer);
-        *framebuffer = new;
-    }
-
-    pub fn bind(&self, framebuffer: &Framebuffer) {
+    pub fn clear_color(&self, r: f32, g: f32, b: f32, a: f32) {
         unsafe {
-            gl::bind_framebuffer(gl::FRAMEBUFFER, Some(gl::GlFramebuffer(framebuffer.handle)));
-            gl::viewport(
+            gl::clear_named_framebuffer_f32_slice(
+                gl::GlFramebuffer(self.handle),
+                gl::COLOR,
                 0,
-                0,
-                framebuffer.config.width as i32,
-                framebuffer.config.height as i32,
-            );
+                &[r, g, b, a],
+            )
         }
     }
 
-    pub fn unbind(&self) {
+    pub fn clear_depth(&self, value: f32) {
+        unsafe {
+            gl::clear_named_framebuffer_f32(gl::GlFramebuffer(self.handle), gl::DEPTH, 0, value)
+        }
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.config.width = width;
+        self.config.height = height;
+        let new = Self::new(&self.config);
+        self.delete();
+        *self = new;
+    }
+
+    pub fn bind(&self) {
+        unsafe {
+            gl::bind_framebuffer(gl::FRAMEBUFFER, Some(gl::GlFramebuffer(self.handle)));
+            gl::viewport(0, 0, self.config.width as i32, self.config.height as i32);
+        }
+    }
+
+    pub fn unbind() {
         unsafe { gl::bind_framebuffer(gl::FRAMEBUFFER, None) }
     }
 
-    pub fn delete(&self, framebuffer: &Framebuffer) {
-        self.unbind();
+    pub fn delete(&self) {
+        Self::unbind();
 
-        match framebuffer.colour_handle {
-            FramebufferAttachmentHandle::Renderbuffer(handle) => unsafe {
+        match self.colour_handle {
+            FramebufferAttachment::Renderbuffer(handle) => unsafe {
                 gl::delete_renderbuffer(gl::GlRenderbuffer(handle))
             },
-            FramebufferAttachmentHandle::Texture(handle) => unsafe {
-                gl::delete_texture(gl::GlTexture(handle))
+            FramebufferAttachment::Texture(ref texture) => unsafe {
+                gl::delete_texture(gl::GlTexture(texture.handle))
             },
-            FramebufferAttachmentHandle::None => (),
+            FramebufferAttachment::None => (),
         }
 
-        match framebuffer.depth_handle {
-            FramebufferAttachmentHandle::Renderbuffer(handle) => unsafe {
+        match self.depth_handle {
+            FramebufferAttachment::Renderbuffer(handle) => unsafe {
                 gl::delete_renderbuffer(gl::GlRenderbuffer(handle))
             },
-            FramebufferAttachmentHandle::Texture(handle) => unsafe {
-                gl::delete_texture(gl::GlTexture(handle))
+            FramebufferAttachment::Texture(ref texture) => unsafe {
+                gl::delete_texture(gl::GlTexture(texture.handle))
             },
-            FramebufferAttachmentHandle::None => (),
+            FramebufferAttachment::None => (),
         }
 
-        match framebuffer.stencil_handle {
-            FramebufferAttachmentHandle::Renderbuffer(handle) => unsafe {
+        match self.stencil_handle {
+            FramebufferAttachment::Renderbuffer(handle) => unsafe {
                 gl::delete_renderbuffer(gl::GlRenderbuffer(handle))
             },
-            FramebufferAttachmentHandle::Texture(handle) => unsafe {
-                gl::delete_texture(gl::GlTexture(handle))
+            FramebufferAttachment::Texture(ref texture) => unsafe {
+                gl::delete_texture(gl::GlTexture(texture.handle))
             },
-            FramebufferAttachmentHandle::None => (),
+            FramebufferAttachment::None => (),
         }
 
-        unsafe { gl::delete_framebuffer(gl::GlFramebuffer(framebuffer.handle)) }
+        unsafe { gl::delete_framebuffer(gl::GlFramebuffer(self.handle)) }
     }
 }

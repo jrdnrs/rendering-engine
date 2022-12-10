@@ -44,7 +44,7 @@ impl BufferElement {
 }
 
 impl BufferLayout {
-    pub fn new(mut elements: Vec<BufferElement>, buffer_size: usize, divisor: usize) -> Self {
+    pub fn new(mut elements: Vec<BufferElement>, buffer_size: u32, divisor: u32) -> Self {
         let mut offset = 0;
         for element in elements.iter_mut() {
             element.offset = offset;
@@ -61,7 +61,7 @@ impl BufferLayout {
 }
 
 impl VertexArray {
-    pub fn new(layouts: Vec<BufferLayout>, ebo_size: usize, multiple: usize) -> Self {
+    pub fn new(layouts: Vec<BufferLayout>, ebo_size: u32, multiple: u32) -> Self {
         let vao = unsafe { gl::create_named_vertex_array().unwrap() };
 
         let mut vbos = Vec::new();
@@ -87,9 +87,9 @@ impl VertexArray {
         vertex_array
     }
 
-    pub fn set_divisor(&mut self, buffer_index: usize, divisor: usize) {
-        if self.vertex_layouts[buffer_index].divisor != divisor {
-            self.vertex_layouts[buffer_index].divisor = divisor;
+    pub fn set_divisor(&mut self, buffer_index: u32, divisor: u32) {
+        if self.vertex_layouts[buffer_index as usize].divisor != divisor {
+            self.vertex_layouts[buffer_index as usize].divisor = divisor;
             unsafe {
                 gl::vertex_array_binding_divisor(
                     gl::GlVertexArray(self.handle),
@@ -179,7 +179,7 @@ impl VertexArray {
         unsafe { gl::bind_vertex_array(Some(gl::GlVertexArray(self.handle))) }
     }
 
-    pub fn unbind(&self) {
+    pub fn unbind() {
         unsafe { gl::bind_vertex_array(None) }
     }
 }
@@ -191,7 +191,7 @@ impl BufferLockManager {
         }
     }
 
-    fn check_range_intersect(&mut self, start: usize, length: usize) -> Option<BufferLock> {
+    fn check_range_intersect(&mut self, start: u32, length: u32) -> Option<BufferLock> {
         for (i, bl) in self.buffer_locks.iter().enumerate() {
             if start < (bl.start + bl.length) && bl.start < (start + length) {
                 return Some(self.buffer_locks.remove(i));
@@ -201,14 +201,14 @@ impl BufferLockManager {
     }
 
     /// Checks if there is a current fence in progress for this range and, if so, blocks until it completes
-    pub fn wait_for_locked_range(&mut self, start: usize, length: usize) {
+    pub fn wait_for_locked_range(&mut self, start: u32, length: u32) {
         if let Some(bl) = self.check_range_intersect(start, length) {
             self.wait(bl)
         }
     }
 
     /// Adds a fence to GPU command stream
-    pub fn lock_range(&mut self, start: usize, length: usize) {
+    pub fn lock_range(&mut self, start: u32, length: u32) {
         let fence_handle = unsafe { gl::fence_sync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0) }.unwrap();
 
         let bl = BufferLock {
@@ -227,7 +227,11 @@ impl BufferLockManager {
 
         unsafe {
             loop {
-                match gl::client_wait_sync(gl::GlFence(buffer_lock.fence_handle), wait_flags, wait_duration) {
+                match gl::client_wait_sync(
+                    gl::GlFence(buffer_lock.fence_handle),
+                    wait_flags,
+                    wait_duration,
+                ) {
                     gl::ALREADY_SIGNALED | gl::CONDITION_SATISFIED => {
                         // trace!("{}", format!(
                         //     "Completed lock at range: {}-{}",
@@ -262,7 +266,7 @@ impl BufferLockManager {
 }
 
 impl BufferStorage {
-    pub fn new(buffer_type: BufferType, size_bytes: usize, multiple: usize) -> Self {
+    pub fn new(buffer_type: BufferType, size_bytes: u32, multiple: u32) -> Self {
         let handle: gl::GlBuffer;
         let map_flags = gl::MAP_WRITE_BIT | gl::MAP_PERSISTENT_BIT | gl::MAP_COHERENT_BIT;
         let buffer_flags = map_flags | gl::DYNAMIC_STORAGE_BIT;
@@ -288,6 +292,18 @@ impl BufferStorage {
         }
     }
 
+    pub fn bind_buffer_range(&self, binding_index: u32, offset: u32, size: u32) {
+        unsafe {
+            gl::bind_buffer_range(
+                self.buffer_type as u32,
+                binding_index,
+                Some(gl::GlBuffer(self.handle)),
+                offset as i32,
+                size as i32,
+            )
+        }
+    }
+
     /// Round-robin to next section, if there are more than one
     pub fn next_section(&mut self) {
         self.current_section = (self.current_section + 1) % self.sections;
@@ -296,7 +312,7 @@ impl BufferStorage {
 
     /// As section_buffer_index is a section-local index, this applies an offset with respect to current section
     /// to get an offset into the entire buffer
-    pub fn current_buffer_index(&self) -> usize {
+    pub fn current_buffer_index(&self) -> u32 {
         self.section_buffer_index + self.buffer_section_offset
     }
 
@@ -306,13 +322,13 @@ impl BufferStorage {
     }
 
     /// Reset the section-local buffer index to 0
-    pub fn increase_index(&mut self, increment: usize) {
+    pub fn increase_index(&mut self, increment: u32) {
         self.section_buffer_index += increment;
     }
 
     /// Wraps buffer_index if the required size_bytes can not fit contigiously in the buffer and waits for any
     /// fences associated with the range to be met.
-    pub fn reserve(&mut self, size_bytes: usize) {
+    pub fn reserve(&mut self, size_bytes: u32) {
         if self.section_buffer_index + size_bytes > self.section_size_bytes {
             self.section_buffer_index = 0;
             // error!(
@@ -321,14 +337,14 @@ impl BufferStorage {
             // )
         }
 
-        // self.buffer_lock_man
-        //     .wait_for_locked_range(self.current_buffer_index(), size_bytes)
+        self.buffer_lock_man
+            .wait_for_locked_range(self.current_buffer_index(), size_bytes)
     }
 
     /// Sets a fence at the current point in the command stream. <br>
     /// The fence is associated with a range from _current_section_buffer_index_ to an offset determined by provided
     /// size_bytes.
-    pub fn set_fence(&mut self, size_bytes: usize) {
+    pub fn set_fence(&mut self, size_bytes: u32) {
         self.buffer_lock_man
             .lock_range(self.current_buffer_index(), size_bytes)
     }
@@ -346,7 +362,7 @@ impl BufferStorage {
         }
 
         // it is assumed that user previously calls reserve on the range to avoid overflowing buffer
-        self.section_buffer_index += data.len();
+        self.section_buffer_index += data.len() as u32;
     }
 
     pub fn push_data<T>(&mut self, data: &T) {
@@ -360,28 +376,28 @@ impl BufferStorage {
         }
 
         // it is assumed that user previously calls reserve on the range to avoid overflowing buffer
-        self.section_buffer_index += std::mem::size_of::<T>();
+        self.section_buffer_index += std::mem::size_of::<T>() as u32;
     }
 
-    pub fn set_data_slice<T: bytemuck::Pod>(&mut self, data: &[T], offset: usize) {
+    pub fn set_data_slice<T: bytemuck::Pod>(&mut self, data: &[T], offset: u32) {
         let data: &[u8] = bytemuck::cast_slice(data);
 
         unsafe {
             std::ptr::copy_nonoverlapping(
                 data.as_ptr(),
                 self.buffer_base_pointer
-                    .add(self.buffer_section_offset as usize + offset),
+                    .add((self.buffer_section_offset + offset) as usize),
                 data.len(),
             );
         }
     }
 
-    pub fn set_data<T>(&mut self, data: &T, offset: usize) {
+    pub fn set_data<T>(&mut self, data: &T, offset: u32) {
         unsafe {
             std::ptr::copy_nonoverlapping(
                 data as *const T as *const u8,
                 self.buffer_base_pointer
-                    .add(self.buffer_section_offset as usize + offset),
+                    .add((self.buffer_section_offset + offset) as usize),
                 std::mem::size_of::<T>(),
             );
         }

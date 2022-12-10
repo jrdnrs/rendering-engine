@@ -15,6 +15,7 @@ pub struct Mesh {
     pub indices: Vec<u32>,
 }
 
+#[derive(Clone, Copy)]
 pub struct Material {
     pub shininess: f32,
     pub diffuse_texture_id: Option<TextureID>,

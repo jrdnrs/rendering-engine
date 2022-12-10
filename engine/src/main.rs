@@ -28,8 +28,8 @@ fn main() {
     let _ = log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 
-    let (context, event_loop, gl) = Context::new();
-    let engine = Engine::new(context, &gl);
+    let (context, event_loop) = Context::new();
+    let engine = Engine::new(context);
     engine.run(event_loop);
 }
 struct Logger;

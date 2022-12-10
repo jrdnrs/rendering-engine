@@ -1,33 +1,27 @@
-use glow::{self as gl, HasContext};
-
 use super::PipelineStage;
 use crate::{
     components::Renderable,
+    graphics::{self, state::RasteriserState, DataType, DrawMode},
     math::Mat4f,
     memory_manager::memory_manager::{
         DrawElementsIndirectCommand, InstanceData, MemoryManager, DRAW_COMMAND_SIZE,
     },
-    renderer::{
-        command::DrawCommands,
-        state::{RasteriserState, RendererState},
-    },
+    renderer::{command::DrawCommands, state::RendererState},
     resource_manager::resource_manager::{
         FramebufferID, MaterialID, MeshID, ResourceIDTrait, ResourcesManager, ShaderProgramID,
     },
 };
 
-pub struct SceneStage<'a> {
-    gl: &'a gl::Context,
+pub struct SceneStage {
     target: FramebufferID,
     renderable_indices: Vec<usize>,
     command_queue: DrawCommands,
     pending_indirect_command_count: u32,
 }
 
-impl<'a> SceneStage<'a> {
-    pub fn new(gl: &'a gl::Context, target: FramebufferID) -> Self {
+impl SceneStage {
+    pub fn new(target: FramebufferID) -> Self {
         Self {
-            gl,
             target,
             renderable_indices: Vec::new(),
             command_queue: DrawCommands::new(hash),
@@ -36,7 +30,7 @@ impl<'a> SceneStage<'a> {
     }
 }
 
-impl<'a> PipelineStage for SceneStage<'a> {
+impl PipelineStage for SceneStage {
     fn get_target(&self) -> FramebufferID {
         self.target
     }
@@ -58,84 +52,35 @@ impl<'a> PipelineStage for SceneStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        rasteriser_state: &mut RasteriserState,
         renderables: &[Renderable],
     ) {
-        unsafe { self.gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) }
+        let fb = resources_manager.borrow_framebuffer(&self.target).unwrap();
+
+        // fb.clear_color(0.4, 0.5, 0.9, 1.0);
+        fb.clear_depth(1.0);
 
         self.command_queue
             .update_keys(renderables, &self.renderable_indices);
         self.command_queue.sort_indices();
 
-        // HACK: added a dummy renderable to the end to otherwise the last renderable would be cut off
-        // when iterating through renderables with renderable and next_renderable. zip stops when one returns None
-        // self.renderables.push(Renderable {
-        //     mesh_id: MeshID::new(0xFFFF),
-        //     material_id: MaterialID::new(0xFFFF),
-        //     shader_id: ShaderProgramID::new(0xFFFF),
-        //     transform: Mat4f::identity(),
-        //     pipeline_stages: 0,
-        // });
-        // self.command_queue.indices.push(self.renderables.len() - 1);
-
         let mut instance_count = 0;
 
-        // for i in 0..self.command_queue.indices.len() {
-        //     let renderable = &renderables[self.renderable_indices[i]];
-        //     let next_renderable = if i == self.command_queue.indices.len() {
-        //         Renderable {
-        //             mesh_id: MeshID::new(0xFFFF),
-        //             material_id: MaterialID::new(0xFFFF),
-        //             shader_id: ShaderProgramID::new(0xFFFF),
-        //             transform: Mat4f::identity(),
-        //             pipeline_stages: 0,
-        //         }
-        //     } else {
-        //         &renderables[self.renderable_indices[i + 1]]
-        //     };
+        let r = Renderable {
+            mesh_id: MeshID::new(0xFFFF),
+            material_id: MaterialID::new(0xFFFF),
+            shader_id: ShaderProgramID::new(0xFFFF),
+            transform: Mat4f::identity(),
+            pipeline_stages: 0,
+        };
 
-        //     instance_count += 1;
-
-        //     if renderable.shader_id != next_renderable.shader_id
-        //         || renderable.mesh_id != next_renderable.mesh_id
-        //     {
-        //         memory_manager.reserve_instance_space(instance_count);
-        //         upload_draw_data(
-        //             memory_manager,
-        //             resources_manager,
-        //             renderable,
-        //             instance_count,
-        //         );
-        //         self.pending_indirect_command_count += 1;
-
-        //         for instance_index in
-        //             self.command_queue.indices[(i - (instance_count - 1) as usize)..(i + 1)].iter()
-        //         {
-        //             let renderable = &renderables[self.renderable_indices[*instance_index]];
-
-        //             memory_manager.push_instance_data(&InstanceData {
-        //                 material_index: renderable.material_id.index(),
-        //                 transform: renderable.transform,
-        //             });
-        //         }
-
-        //         instance_count = 0;
-        //     }
-        //     if renderable.shader_id != next_renderable.shader_id {
-        //         renderer_state.set_shader_program(renderable.shader_id, resources_manager);
-        //         make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
-        //         self.pending_indirect_command_count = 0;
-        //     }
-        // }
-
-        for (i, (index, next_index)) in self
-            .command_queue
-            .indices
-            .iter()
-            .zip(self.command_queue.indices[1..].iter())
-            .enumerate()
-        {
-            let renderable = &renderables[self.renderable_indices[*index]];
-            let next_renderable = &renderables[self.renderable_indices[*next_index]];
+        for i in 0..self.command_queue.indices.len() {
+            let renderable = &renderables[self.renderable_indices[self.command_queue.indices[i]]];
+            let next_renderable = if i == self.command_queue.indices.len() - 1 {
+                &r
+            } else {
+                &renderables[self.renderable_indices[self.command_queue.indices[i + 1]]]
+            };
 
             instance_count += 1;
 
@@ -152,7 +97,7 @@ impl<'a> PipelineStage for SceneStage<'a> {
                 self.pending_indirect_command_count += 1;
 
                 for instance_index in
-                    self.command_queue.indices[(i - (instance_count - 1) as usize)..(i + 1)].iter()
+                    self.command_queue.indices[(i - (instance_count - 1) as usize)..=i].iter()
                 {
                     let renderable = &renderables[self.renderable_indices[*instance_index]];
 
@@ -166,7 +111,14 @@ impl<'a> PipelineStage for SceneStage<'a> {
             }
             if renderable.shader_id != next_renderable.shader_id {
                 renderer_state.set_shader_program(renderable.shader_id, resources_manager);
-                make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+                graphics::submit_draw_call(
+                    DrawMode::Triangles,
+                    DataType::Uint32,
+                    (memory_manager.get_indirect_command_index()
+                        - self.pending_indirect_command_count)
+                        * DRAW_COMMAND_SIZE,
+                    self.pending_indirect_command_count,
+                );
                 self.pending_indirect_command_count = 0;
             }
         }
@@ -202,17 +154,4 @@ fn upload_draw_data(
     memory_manager.push_indirect_command(indirect_command);
     memory_manager.push_vertex_slice(&mesh.vertices);
     memory_manager.push_index_slice(&mesh.indices);
-}
-
-fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: u32) {
-    unsafe {
-        gl.multi_draw_elements_indirect_offset(
-            gl::TRIANGLES,
-            gl::UNSIGNED_INT,
-            ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
-                as i32,
-            command_count as i32,
-            0,
-        );
-    }
 }

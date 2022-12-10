@@ -1,13 +1,10 @@
 use std::time;
 
 use ecs::World;
-use glow::{self as gl, HasContext};
 use glutin::{
     event::{DeviceEvent, Event, MouseButton, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    monitor::VideoMode,
     platform::run_return::EventLoopExtRunReturn,
-    window::Fullscreen,
 };
 use log::debug;
 
@@ -21,24 +18,21 @@ use crate::{
     resource_manager::{
         model::Material,
         prefabs::{self, sphere, unit_cube_mesh},
-        texture::TextureConfig,
-    },
+    }, graphics::{texture::{TextureFilter, TextureConfig, TextureWrap}, self},
 };
 
 pub struct Engine<'a> {
-    gl: &'a gl::Context,
     context: Context,
     renderer: Renderer<'a>,
     input: Input,
     world: World,
 }
 
-impl<'a> Engine<'a> {
-    pub fn new(context: Context, gl: &'a gl::Context) -> Self {
+impl Engine<'_> {
+    pub fn new(context: Context) -> Self {
         Engine {
             context,
-            gl,
-            renderer: Renderer::new(gl),
+            renderer: Renderer::new(),
             input: Input::new(),
             world: World::new(),
         }
@@ -112,7 +106,7 @@ impl<'a> Engine<'a> {
                     .resources
                     .iter_mut()
                 {
-                    p.reload();
+                    p.reload_shaders();
                 }
             }
 
@@ -174,7 +168,7 @@ impl<'a> Engine<'a> {
 
     /// This runs once before rendering occurs
     fn setup(&mut self) {
-        self.renderer.set_clear_colour(0.4, 0.5, 0.9, 1.0);
+        graphics::set_clear_color(0.4, 0.5, 0.9, 1.0);
         let window_size = self.context.window_context.window().inner_size();
         self.renderer
             .set_viewport(window_size.width, window_size.height);
@@ -184,7 +178,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/lamp.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: true,
                     srgb: true,
                     ..Default::default()
                 },
@@ -195,7 +191,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/mossy_cobblestone.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: true,
                     srgb: true,
                     ..Default::default()
                 },
@@ -206,7 +204,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/oak_planks.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: true,
                     srgb: true,
                     ..Default::default()
                 },
@@ -218,7 +218,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/lamp_s.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: false,
                     srgb: false,
                     ..Default::default()
                 },
@@ -229,7 +231,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/oak_planks_s.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: false,
                     srgb: false,
                     ..Default::default()
                 },
@@ -241,7 +245,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/lamp_n.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: false,
                     srgb: false,
                     ..Default::default()
                 },
@@ -252,7 +258,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/mossy_cobblestone_n.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: false,
                     srgb: false,
                     ..Default::default()
                 },
@@ -263,7 +271,9 @@ impl<'a> Engine<'a> {
             .load_texture(
                 "res/textures/oak_planks_n.dds",
                 &TextureConfig {
-                    min_filter: gl::LINEAR_MIPMAP_LINEAR,
+                    min_filter: TextureFilter::Linear,
+                    mag_filter: TextureFilter::Nearest,
+                    mipmap: false,
                     srgb: false,
                     ..Default::default()
                 },
@@ -328,9 +338,10 @@ impl<'a> Engine<'a> {
                     "res/textures/skybox/CoriolisNight/nz.dds",
                 ],
                 &TextureConfig {
-                    wrap: gl::CLAMP_TO_EDGE,
-                    mag_filter: gl::LINEAR,
-                    min_filter: gl::LINEAR,
+                    wrap: TextureWrap::ClampToEdge,
+                    mag_filter: TextureFilter::Linear,
+                    min_filter: TextureFilter::Linear,
+                    mipmap: false,
                     srgb: true,
                 },
             )
@@ -728,43 +739,41 @@ impl<'a> Engine<'a> {
                 Event::MainEventsCleared if crate::VSYNC => {
                     self.context.window_context.window().request_redraw();
                 }
-                Event::MainEventsCleared => {
-                    // microseconds left before target time, before we should spin
-                    // poor timings on Windows means this should be >= 1000
-                    let spin_threshold = 1000;
+                // Event::MainEventsCleared => {
+                //     // microseconds left before target time, before we should spin
+                //     // poor timings on Windows means this should be >= 1000
+                //     let spin_threshold = 1000;
 
-                    let now = time::Instant::now();
-                    if now >= self.context.target_time {
-                        self.context.target_time = now + self.context.target_frametime;
-                        self.context.window_context.window().request_redraw();
-                    }
+                //     let now = time::Instant::now();
+                //     if now >= self.context.target_time {
+                //         self.context.target_time = now + self.context.target_frametime;
+                //         self.context.window_context.window().request_redraw();
+                //     }
 
-                    let now = time::Instant::now();
-                    let delta = self.context.target_time - now;
-                    if delta < time::Duration::from_micros(spin_threshold) {
-                        return;
-                    }
+                //     let now = time::Instant::now();
+                //     let delta = self.context.target_time - now;
+                //     if delta < time::Duration::from_micros(spin_threshold) {
+                //         return;
+                //     }
 
-                    let mut sleep_time = time::Duration::from_micros(
-                        (delta.as_micros() - (delta.as_micros() % spin_threshold as u128)) as u64,
-                    );
+                //     let mut sleep_time = time::Duration::from_micros(
+                //         (delta.as_micros() - (delta.as_micros() % spin_threshold as u128)) as u64,
+                //     );
 
-                    if delta > time::Duration::from_micros((1000000.0 / 144.0) as u64)
-                        && (self.context.being_moved || self.context.being_resized)
-                    {
-                        sleep_time = time::Duration::from_micros(
-                            ((1000000.0 / 144.0) - ((1000000.0 / 144.0) % spin_threshold as f64))
-                                as u64,
-                        );
-                    }
+                //     if delta > time::Duration::from_micros((1000000.0 / 144.0) as u64)
+                //         && (self.context.being_moved || self.context.being_resized)
+                //     {
+                //         sleep_time = time::Duration::from_micros(
+                //             ((1000000.0 / 144.0) - ((1000000.0 / 144.0) % spin_threshold as f64))
+                //                 as u64,
+                //         );
+                //     }
 
-                    spin_sleep::sleep(sleep_time);
-                }
+                //     spin_sleep::sleep(sleep_time);
+                // }
                 Event::RedrawRequested(_) => {
                     self.update();
-                    // unsafe {
-                    //     self.gl.flush();
-                    // }
+                  
                     self.context.window_context.swap_buffers().unwrap();
 
                     let now = time::Instant::now();

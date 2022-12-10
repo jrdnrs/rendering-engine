@@ -1,5 +1,3 @@
-use glow::{self as gl, HasContext};
-
 use crate::{
     math::*,
     memory_manager::{
@@ -8,45 +6,10 @@ use crate::{
     },
     resource_manager::resource_manager::{
         FramebufferID, ResourceIDTrait, ResourceManagerTrait, ResourcesManager, ShaderProgramID,
-    },
+    }, graphics::framebuffer::Framebuffer,
 };
 
-#[derive(PartialEq)]
-pub struct RasteriserState {
-    pub blend: bool,
-    pub blend_func: (u32, u32),
-    pub culling: bool,
-    pub cull_face: u32,
-    pub front_face: u32,
-    pub depth: bool,
-    pub depth_mask: bool,
-    pub depth_func: u32,
-    pub stencil: bool,
-    pub stencil_func: (u32, i32, u32),
-    pub scissor: bool,
-}
-
-impl Default for RasteriserState {
-    fn default() -> Self {
-        Self {
-            blend: true,
-            blend_func: (gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA),
-            culling: true,
-            cull_face: gl::BACK,
-            front_face: gl::CW,
-            depth: true,
-            depth_mask: true,
-            depth_func: gl::LESS,
-            stencil: false,
-            stencil_func: (gl::ALWAYS, 0, u32::max_value()),
-            scissor: false,
-        }
-    }
-}
-
-pub struct RendererState<'a> {
-    gl: &'a gl::Context,
-
+pub struct RendererState {
     pub shader_program: Option<ShaderProgramID>,
     pub framebuffer: Option<FramebufferID>,
     // pub vertex_array: ,
@@ -64,15 +27,11 @@ pub struct RendererState<'a> {
 
     pub light_ortho_projection: Mat4f,
     pub light_persp_projection: Mat4f,
-
-    pub rasteriser_state: RasteriserState,
 }
 
-impl<'a> RendererState<'a> {
-    pub fn new(gl: &'a gl::Context) -> Self {
-        let rs = Self {
-            gl,
-
+impl RendererState {
+    pub fn new() -> Self {
+        Self {
             shader_program: None,
             framebuffer: None,
 
@@ -87,69 +46,7 @@ impl<'a> RendererState<'a> {
 
             light_ortho_projection: Mat4f::identity(),
             light_persp_projection: Mat4f::identity(),
-
-            rasteriser_state: RasteriserState::default(),
-        };
-
-        rs.init();
-
-        rs
-    }
-
-    // set initial settings
-    fn init(&self) {
-        if self.rasteriser_state.blend {
-            unsafe { self.gl.enable(gl::BLEND) }
-        } else {
-            unsafe { self.gl.disable(gl::BLEND) }
         }
-
-        if self.rasteriser_state.depth {
-            unsafe { self.gl.enable(gl::DEPTH_TEST) }
-        } else {
-            unsafe { self.gl.disable(gl::DEPTH_TEST) }
-        }
-
-        if self.rasteriser_state.stencil {
-            unsafe { self.gl.enable(gl::STENCIL_TEST) }
-        } else {
-            unsafe { self.gl.disable(gl::STENCIL_TEST) }
-        }
-
-        if self.rasteriser_state.scissor {
-            unsafe { self.gl.enable(gl::SCISSOR_TEST) }
-        } else {
-            unsafe { self.gl.disable(gl::SCISSOR_TEST) }
-        }
-
-        unsafe {
-            self.gl.blend_func(
-                self.rasteriser_state.blend_func.0,
-                self.rasteriser_state.blend_func.1,
-            )
-        }
-
-        unsafe { self.gl.depth_func(self.rasteriser_state.depth_func) }
-
-        unsafe {
-            self.gl.stencil_func(
-                self.rasteriser_state.stencil_func.0,
-                self.rasteriser_state.stencil_func.1,
-                self.rasteriser_state.stencil_func.2,
-            )
-        }
-
-        unsafe { self.gl.depth_mask(self.rasteriser_state.depth_mask) }
-
-        unsafe { self.gl.cull_face(self.rasteriser_state.cull_face) }
-
-        if self.rasteriser_state.culling {
-            unsafe { self.gl.enable(gl::CULL_FACE) }
-        } else {
-            unsafe { self.gl.disable(gl::CULL_FACE) }
-        }
-
-        unsafe { self.gl.front_face(self.rasteriser_state.front_face) }
     }
 
     pub fn upload_camera_data(&self, memory_manager: &mut MemoryManager) {
@@ -178,98 +75,6 @@ impl<'a> RendererState<'a> {
         self.point_lights.clear();
         self.spot_lights.clear();
         self.directional_light = None;
-    }
-
-    pub fn set_rasteriser_state(&mut self, state: RasteriserState) {
-        if self.rasteriser_state == state {
-            return;
-        }
-
-        if state.blend != self.rasteriser_state.blend {
-            self.rasteriser_state.blend = state.blend;
-            if self.rasteriser_state.blend {
-                unsafe { self.gl.enable(gl::BLEND) }
-            } else {
-                unsafe { self.gl.disable(gl::BLEND) }
-            }
-        }
-
-        if state.depth != self.rasteriser_state.depth {
-            self.rasteriser_state.depth = state.depth;
-            if self.rasteriser_state.depth {
-                unsafe { self.gl.enable(gl::DEPTH_TEST) }
-            } else {
-                unsafe { self.gl.disable(gl::DEPTH_TEST) }
-            }
-        }
-
-        if state.stencil != self.rasteriser_state.stencil {
-            self.rasteriser_state.stencil = state.stencil;
-            if self.rasteriser_state.stencil {
-                unsafe { self.gl.enable(gl::STENCIL_TEST) }
-            } else {
-                unsafe { self.gl.disable(gl::STENCIL_TEST) }
-            }
-        }
-
-        if state.scissor != self.rasteriser_state.scissor {
-            self.rasteriser_state.scissor = state.scissor;
-            if self.rasteriser_state.scissor {
-                unsafe { self.gl.enable(gl::SCISSOR_TEST) }
-            } else {
-                unsafe { self.gl.disable(gl::SCISSOR_TEST) }
-            }
-        }
-
-        if state.blend_func != self.rasteriser_state.blend_func {
-            self.rasteriser_state.blend_func = state.blend_func;
-            unsafe {
-                self.gl.blend_func(
-                    self.rasteriser_state.blend_func.0,
-                    self.rasteriser_state.blend_func.1,
-                )
-            }
-        }
-
-        if state.depth_func != self.rasteriser_state.depth_func {
-            self.rasteriser_state.depth_func = state.depth_func;
-            unsafe { self.gl.depth_func(self.rasteriser_state.depth_func) }
-        }
-
-        if state.stencil_func != self.rasteriser_state.stencil_func {
-            self.rasteriser_state.stencil_func = state.stencil_func;
-            unsafe {
-                self.gl.stencil_func(
-                    self.rasteriser_state.stencil_func.0,
-                    self.rasteriser_state.stencil_func.1,
-                    self.rasteriser_state.stencil_func.2,
-                )
-            }
-        }
-
-        if state.depth_mask != self.rasteriser_state.depth_mask {
-            self.rasteriser_state.depth_mask = state.depth_mask;
-            unsafe { self.gl.depth_mask(self.rasteriser_state.depth_mask) }
-        }
-
-        if state.cull_face != self.rasteriser_state.cull_face {
-            self.rasteriser_state.cull_face = state.cull_face;
-            unsafe { self.gl.cull_face(self.rasteriser_state.cull_face) }
-        }
-
-        if state.culling != self.rasteriser_state.culling {
-            self.rasteriser_state.culling = state.culling;
-            if self.rasteriser_state.culling {
-                unsafe { self.gl.enable(gl::CULL_FACE) }
-            } else {
-                unsafe { self.gl.disable(gl::CULL_FACE) }
-            }
-        }
-
-        if state.front_face != self.rasteriser_state.front_face {
-            self.rasteriser_state.front_face = state.front_face;
-            unsafe { self.gl.front_face(self.rasteriser_state.front_face) }
-        }
     }
 
     pub fn set_shader_program(
@@ -315,7 +120,7 @@ impl<'a> RendererState<'a> {
             true
         } else {
             self.framebuffer = None;
-            unsafe { self.gl.bind_framebuffer(gl::FRAMEBUFFER, None) }
+            Framebuffer::unbind();
             true
         }
     }

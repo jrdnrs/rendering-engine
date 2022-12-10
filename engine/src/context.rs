@@ -1,11 +1,12 @@
 use std::time;
 
-use glow::{self as gl, HasContext};
-use glutin::{self, event_loop::EventLoop, window::Window, ContextWrapper, PossiblyCurrent};
+use glutin::{self, event_loop::EventLoop, window::Window, PossiblyCurrent};
 use log::info;
 
+use crate::graphics::{self, GraphicsContext};
+
 pub struct Context {
-    // pub gl: gl::Context,
+    pub graphics_context: GraphicsContext,
     pub window_context: glutin::ContextWrapper<PossiblyCurrent, Window>,
 
     pub target_frametime: time::Duration,
@@ -22,12 +23,8 @@ pub struct Context {
     pub fullscreen: bool,
 }
 
-fn load_opengl(window_context: ContextWrapper<PossiblyCurrent, Window>) -> gl::Context {
-    unsafe { gl::Context::from_loader_function(|s| window_context.get_proc_address(s) as *const _) }
-}
-
 impl Context {
-    pub fn new() -> (Self, EventLoop<()>, gl::Context) {
+    pub fn new() -> (Self, EventLoop<()>) {
         unsafe {
             let event_loop = glutin::event_loop::EventLoop::new();
 
@@ -46,59 +43,65 @@ impl Context {
                 .make_current()
                 .unwrap();
 
-            let gl = gl::Context::from_loader_function(|s| {
+            let graphics_context = graphics::GraphicsContext::init(&|s| {
                 window_context.get_proc_address(s) as *const _
             });
-
-            info!(
-                "Version: {}.{}",
-                gl.get_parameter_i32(gl::MAJOR_VERSION),
-                gl.get_parameter_i32(gl::MINOR_VERSION)
-            );
-            info!(
-                "Profile: {}",
-                if gl.get_parameter_i32(gl::CONTEXT_PROFILE_MASK) == 1 {
-                    "Core"
-                } else {
-                    "Compatability"
-                }
-            );
-            info!(
-                "Uniform Buffer Offset Alignment: {} B",
-                gl.get_parameter_i32(gl::UNIFORM_BUFFER_OFFSET_ALIGNMENT),
-            );
-            info!(
-                "Uniform Buffer Size: {:.2} MB",
-                gl.get_parameter_i64(gl::MAX_UNIFORM_BLOCK_SIZE) as f64 / 1_000_000.0,
-            );
-            info!(
-                "Shader Storage Offset Alignment: {} B",
-                gl.get_parameter_i32(gl::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT),
-            );
-            info!(
-                "Shader Storage Size: {:.2} MB",
-                gl.get_parameter_i64(gl::MAX_SHADER_STORAGE_BLOCK_SIZE) as f64 / 1_000_000.0,
-            );
 
             let frametime = time::Duration::from_secs_f32(1.0 / crate::FPS as f32);
             let target_time = time::Instant::from(time::Instant::now() + frametime);
 
-            (
-                Context {
-                    window_context,
-                    // gl,
-                    target_frametime: frametime,
-                    target_time,
-                    last_frame_time: time::Instant::now(),
-                    last_frame_delta: time::Duration::new(0, 0),
-                    being_resized: false,
-                    being_moved: false,
-                    frames: 0,
-                    fullscreen: false,
-                },
-                event_loop,
-                gl,
-            )
+            let context = Context {
+                graphics_context,
+                window_context,
+                target_frametime: frametime,
+                target_time,
+                last_frame_time: time::Instant::now(),
+                last_frame_delta: time::Duration::new(0, 0),
+                being_resized: false,
+                being_moved: false,
+                frames: 0,
+                fullscreen: false,
+            };
+
+            #[cfg(debug_assertions)]
+            context.debug_info();
+
+            (context, event_loop)
         }
+    }
+
+    fn debug_info(&self) {
+        info!(
+            "Uniform Buffer Offset Alignment: {} B",
+            self.graphics_context
+                .info
+                .get("uniform_buffer_offset_alignment")
+                .unwrap()
+        );
+        info!(
+            "Uniform Buffer Size: {:.2} MB",
+            *self
+                .graphics_context
+                .info
+                .get("max_uniform_buffer_size")
+                .unwrap() as f64
+                / 1_000_000.0,
+        );
+        info!(
+            "Shader Storage Offset Alignment: {} B",
+            self.graphics_context
+                .info
+                .get("shader_storage_offset_alignment")
+                .unwrap(),
+        );
+        info!(
+            "Shader Storage Size: {:.2} MB",
+            *self
+                .graphics_context
+                .info
+                .get("max_shader_storage_size")
+                .unwrap() as f64
+                / 1_000_000.0,
+        );
     }
 }

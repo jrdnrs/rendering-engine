@@ -1,23 +1,18 @@
 use std::{collections::VecDeque, marker::PhantomData};
 
-use glow::{self as gl, HasContext};
-
-use super::{
+use super::model::*;
+use crate::graphics::{
     framebuffer::{Framebuffer, FramebufferConfig},
-    gl_image::GlImage,
-    model::*,
-    shader::*,
-    texture::*,
+    shader::Program,
+    texture::{Image, Texture, TextureConfig, TextureFilter, TextureWrap},
 };
 
-pub struct ResourcesManager<'a> {
-    gl: &'a gl::Context,
-
+pub struct ResourcesManager {
     pub mesh_manager: ResourceManager<Mesh, MeshID>,
     pub material_manager: ResourceManager<Material, MaterialID>,
-    pub shader_program_manager: ResourceManager<Program<'a>, ShaderProgramID>,
-    pub texture_manager: ResourceManager<Texture<'a>, TextureID>,
-    pub framebuffer_manager: ResourceManager<Framebuffer<'a>, FramebufferID>,
+    pub shader_program_manager: ResourceManager<Program, ShaderProgramID>,
+    pub texture_manager: ResourceManager<Texture, TextureID>,
+    pub framebuffer_manager: ResourceManager<Framebuffer, FramebufferID>,
 
     pub placeholder_diffuse_texture: TextureID,
     pub placeholder_specular_texture: TextureID,
@@ -27,10 +22,9 @@ pub struct ResourcesManager<'a> {
     pub resize_framebuffers: Vec<FramebufferID>,
 }
 
-impl<'a> ResourcesManager<'a> {
-    pub fn new(gl: &'a gl::Context) -> Self {
+impl ResourcesManager {
+    pub fn new() -> Self {
         let mut rm = ResourcesManager {
-            gl,
             mesh_manager: ResourceManager::new(),
             material_manager: ResourceManager::new(),
             shader_program_manager: ResourceManager::new(),
@@ -44,64 +38,58 @@ impl<'a> ResourcesManager<'a> {
             resize_framebuffers: Vec::new(),
         };
 
-        rm.placeholder_diffuse_texture = rm
+        let placeholder_diffuse_texture = rm
             .load_texture(
                 "res/textures/placeholders/diffuse.dds",
                 &TextureConfig {
-                    wrap: gl::REPEAT,
-                    mag_filter: gl::LINEAR,
-                    min_filter: gl::LINEAR,
+                    wrap: TextureWrap::Repeat,
+                    mag_filter: TextureFilter::Linear,
+                    min_filter: TextureFilter::Linear,
+                    mipmap: false,
                     srgb: false,
                 },
             )
             .unwrap();
 
-        rm.placeholder_specular_texture = rm
+        let placeholder_specular_texture = rm
             .load_texture(
                 "res/textures/placeholders/specular.dds",
                 &TextureConfig {
-                    wrap: gl::REPEAT,
-                    mag_filter: gl::LINEAR,
-                    min_filter: gl::LINEAR,
+                    wrap: TextureWrap::Repeat,
+                    mag_filter: TextureFilter::Linear,
+                    min_filter: TextureFilter::Linear,
+                    mipmap: false,
                     srgb: false,
                 },
             )
             .unwrap();
 
-        rm.placeholder_normal_texture = rm
+        let placeholder_normal_texture = rm
             .load_texture(
                 "res/textures/placeholders/normal.dds",
                 &TextureConfig {
-                    wrap: gl::REPEAT,
-                    mag_filter: gl::LINEAR,
-                    min_filter: gl::LINEAR,
+                    wrap: TextureWrap::Repeat,
+                    mag_filter: TextureFilter::Linear,
+                    min_filter: TextureFilter::Linear,
+                    mipmap: false,
                     srgb: false,
                 },
             )
             .unwrap();
 
-        unsafe {
-            let handle = gl.get_texture_handle(
-                rm.borrow_texture(&rm.placeholder_diffuse_texture)
-                    .unwrap()
-                    .handle,
-            );
-            gl.make_texture_handle_resident(handle);
+        rm.borrow_mut_texture(&placeholder_diffuse_texture)
+            .unwrap()
+            .make_texture_resident();
+        rm.borrow_mut_texture(&placeholder_specular_texture)
+            .unwrap()
+            .make_texture_resident();
+        rm.borrow_mut_texture(&placeholder_normal_texture)
+            .unwrap()
+            .make_texture_resident();
 
-            let handle = gl.get_texture_handle(
-                rm.borrow_texture(&rm.placeholder_specular_texture)
-                    .unwrap()
-                    .handle,
-            );
-            gl.make_texture_handle_resident(handle);
-
-            let handle = gl.get_texture_handle(
-                rm.borrow_texture(&rm.placeholder_normal_texture)
-                    .unwrap()
-                    .handle,
-            );
-            gl.make_texture_handle_resident(handle);
-        }
+        rm.placeholder_diffuse_texture = placeholder_diffuse_texture;
+        rm.placeholder_specular_texture = placeholder_specular_texture;
+        rm.placeholder_normal_texture = placeholder_normal_texture;
 
         rm
         // TODO: load default texture and material
@@ -112,9 +100,9 @@ impl<'a> ResourcesManager<'a> {
         path: &'static str,
         config: &TextureConfig,
     ) -> Result<TextureID, String> {
-        match GlImage::from_path(path) {
+        match Image::from_path(path) {
             Ok(img) => {
-                let texture = Texture::new_2d(self.gl, img, config);
+                let texture = Texture::new_2d(img, config);
                 let id = self.texture_manager.load(texture);
                 Ok(id)
             }
@@ -127,16 +115,16 @@ impl<'a> ResourcesManager<'a> {
         paths: [&'static str; 6],
         config: &TextureConfig,
     ) -> Result<TextureID, String> {
-        let mut images: [GlImage; 6] = Default::default();
+        let mut images: [Image; 6] = Default::default();
 
         for (i, path) in paths.iter().enumerate() {
-            match GlImage::from_path(path) {
+            match Image::from_path(path) {
                 Ok(img) => images[i] = img,
                 Err(err) => return Err(err.to_string()),
             }
         }
 
-        let texture = Texture::new_cubemap(self.gl, images, config);
+        let texture = Texture::new_cubemap(images, config);
         let id = self.texture_manager.load(texture);
         Ok(id)
     }
@@ -150,7 +138,7 @@ impl<'a> ResourcesManager<'a> {
     }
 
     pub fn load_shader(&mut self, path: &'static str) -> ShaderProgramID {
-        let mut program = Program::new(self.gl);
+        let mut program = Program::new();
         program.add_shaders(path);
         self.shader_program_manager.load(program)
     }
@@ -198,7 +186,7 @@ impl<'a> ResourcesManager<'a> {
         config: &FramebufferConfig,
         auto_resize: bool,
     ) -> FramebufferID {
-        let framebuffer = Framebuffer::new(&self.gl, config);
+        let framebuffer = Framebuffer::new(config);
         let id = self.framebuffer_manager.load(framebuffer);
         if auto_resize {
             self.resize_framebuffers.push(id);
@@ -237,18 +225,18 @@ impl<'a> ResourcesManager<'a> {
     pub fn borrow_mut_shader_program(
         &mut self,
         shader_id: &ShaderProgramID,
-    ) -> Option<&mut Program<'a>> {
+    ) -> Option<&mut Program> {
         self.shader_program_manager.borrow_mut(shader_id)
     }
 
-    pub fn borrow_mut_texture(&mut self, texture_id: &TextureID) -> Option<&mut Texture<'a>> {
+    pub fn borrow_mut_texture(&mut self, texture_id: &TextureID) -> Option<&mut Texture> {
         self.texture_manager.borrow_mut(texture_id)
     }
 
     pub fn borrow_mut_framebuffer(
         &mut self,
         framebuffer_id: &FramebufferID,
-    ) -> Option<&mut Framebuffer<'a>> {
+    ) -> Option<&mut Framebuffer> {
         self.framebuffer_manager.borrow_mut(framebuffer_id)
     }
 }

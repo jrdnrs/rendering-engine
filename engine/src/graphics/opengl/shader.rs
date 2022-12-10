@@ -11,7 +11,7 @@ use crate::{
     platform::rustgl as gl,
 };
 
-pub fn shader_data_element_count(type_: &ShaderDataType) -> usize {
+pub fn shader_data_element_count(type_: &ShaderDataType) -> u32 {
     match type_ {
         ShaderDataType::Uint1 => 1,
         ShaderDataType::Uint2 => 2,
@@ -31,7 +31,7 @@ pub fn shader_data_element_count(type_: &ShaderDataType) -> usize {
     }
 }
 
-pub fn shader_data_size_bytes(type_: &ShaderDataType) -> usize {
+pub fn shader_data_size_bytes(type_: &ShaderDataType) -> u32 {
     match type_ {
         ShaderDataType::Uint1 => 1 * 4,
         ShaderDataType::Uint2 => 2 * 4,
@@ -165,7 +165,7 @@ impl ShaderBuilder {
 }
 
 impl Program {
-    pub fn new(&self) -> Program {
+    pub fn new() -> Program {
         let gl_prog = unsafe { gl::create_program().unwrap() };
 
         Program {
@@ -176,38 +176,44 @@ impl Program {
         }
     }
 
-    pub fn reload_shaders(&self, program: &mut Program) {
-        program.shader_handles.clear();
-        program.uniform_loc_cache.clear();
-        unsafe { gl::delete_program(gl::GlProgram(program.handle)) };
+    pub fn dispatch_compute(groups_x: u32, groups_y: u32, groups_z: u32) {
+        unsafe {
+            gl::dispatch_compute(groups_x, groups_y, groups_z)
+        }
+    }
+
+    pub fn reload_shaders(&mut self) {
+        self.shader_handles.clear();
+        self.uniform_loc_cache.clear();
+        unsafe { gl::delete_program(gl::GlProgram(self.handle)) };
 
         let gl_prog = unsafe { gl::create_program().unwrap() };
-        program.handle = gl_prog.0;
-        self.add_shaders(program, program.shaders_path);
+        self.handle = gl_prog.0;
+        self.add_shaders(self.shaders_path);
     }
 
     /// Accepts a single string containing multiple shader definitions, each prefaced by <br>
     /// #shader *<shader_type>* <br>
     /// where *<shader_type>* can be vertex, fragment, and so on.
-    pub fn add_shaders(&self, program: &mut Program, shaders_path: &'static str) {
-        program.shaders_path = shaders_path;
+    pub fn add_shaders(&mut self,  shaders_path: &'static str) {
+        self.shaders_path = shaders_path;
 
         match ShaderBuilder::build(shaders_path) {
             Ok(shaders) => {
                 for (shader_type, shader_source) in shaders.iter() {
-                    self.add_shader(program, *shader_type, shader_source);
+                    self.add_shader(*shader_type, shader_source);
                 }
             }
             Err(error) => error!("{}", error),
         }
 
-        for shader in program.shader_handles.iter() {
-            unsafe { gl::detach_shader(gl::GlProgram(program.handle), gl::GlShader(*shader)) }
+        for shader in self.shader_handles.iter() {
+            unsafe { gl::detach_shader(gl::GlProgram(self.handle), gl::GlShader(*shader)) }
         }
     }
 
     /// Attempts to compile and link the shader to this program
-    fn add_shader(&self, program: &mut Program, shader_type: u32, shader_source: &str) {
+    fn add_shader(&mut self, shader_type: u32, shader_source: &str) {
         unsafe {
             // This 'NativeShader' type is a u32 that represents the pointer to our new shader object
             let shader = gl::create_shader(shader_type).unwrap();
@@ -230,14 +236,14 @@ impl Program {
                     } else {
                         "Unknown" // TODO: Add more types
                     },
-                    program.shaders_path,
+                    self.shaders_path,
                 )
                 .blue()
             );
             self.compile_shader(shader);
-            self.link_shader(program, shader);
+            self.link_shader(shader);
 
-            program.shader_handles.push(shader.0);
+            self.shader_handles.push(shader.0);
         }
     }
 
@@ -251,21 +257,21 @@ impl Program {
         self.print_shader_info_log(shader);
     }
 
-    fn link_shader(&self, program: &Program, shader: gl::GlShader) {
+    fn link_shader(&self, shader: gl::GlShader) {
         unsafe {
             // We associate the shader object with a source code string
-            gl::attach_shader(gl::GlProgram(program.handle), shader);
+            gl::attach_shader(gl::GlProgram(self.handle), shader);
 
             // This uses the attached shader objects to create a single executable to run on the GPU
-            gl::link_program(gl::GlProgram(program.handle));
+            gl::link_program(gl::GlProgram(self.handle));
 
             // If a shader object to be deleted is attached to a program object, it will be flagged for deletion, but
             // it will not be deleted until it is no longer attached to any program object
             gl::delete_shader(shader);
         }
 
-        self.print_program_link_status(program);
-        self.print_program_info_log(program);
+        self.print_program_link_status();
+        self.print_program_info_log();
     }
 
     /// Prints the information log for the specified shader object. <br>
@@ -288,8 +294,8 @@ impl Program {
         })
     }
 
-    fn print_program_info_log(&self, program: &Program) {
-        let msg = unsafe { gl::get_program_info_log(gl::GlProgram(program.handle)) };
+    fn print_program_info_log(&self) {
+        let msg = unsafe { gl::get_program_info_log(gl::GlProgram(self.handle)) };
         let msg = msg.trim();
 
         debug!(
@@ -300,38 +306,38 @@ impl Program {
         );
     }
 
-    fn print_program_link_status(&self, program: &Program) {
+    fn print_program_link_status(&self) {
         debug!("{}{}", "Program Link Status: ".cyan(), unsafe {
-            gl::get_program_link_status(gl::GlProgram(program.handle))
+            gl::get_program_link_status(gl::GlProgram(self.handle))
         });
     }
 
-    pub fn bind(&self, program: &Program) {
+    pub fn bind(&self) {
         unsafe {
-            gl::use_program(Some(gl::GlProgram(program.handle)));
+            gl::use_program(Some(gl::GlProgram(self.handle)));
         }
     }
 
-    pub fn unbind(&self) {
+    pub fn unbind() {
         unsafe {
             gl::use_program(None);
         }
     }
 
-    pub fn delete(&self, program: &Program) {
-        self.unbind();
+    pub fn delete(&self) {
+        Self::unbind();
         unsafe {
-            gl::delete_program(gl::GlProgram(program.handle));
+            gl::delete_program(gl::GlProgram(self.handle));
         }
     }
 
-    pub fn set_uniform(&self, program: &mut Program, name: String, type_: ShaderData) {
-        let loc = if let Some(location) = program.uniform_loc_cache.get(&name) {
+    pub fn set_uniform(&mut self, name: String, type_: ShaderData) {
+        let loc = if let Some(location) = self.uniform_loc_cache.get(&name) {
             gl::GlUniformLocation(*location)
         } else if let Some(location) =
-            unsafe { gl::get_uniform_location(gl::GlProgram(program.handle), &name) }
+            unsafe { gl::get_uniform_location(gl::GlProgram(self.handle), &name) }
         {
-            program.uniform_loc_cache.insert(name, location.0);
+            self.uniform_loc_cache.insert(name, location.0);
             location
         } else {
             // error!(

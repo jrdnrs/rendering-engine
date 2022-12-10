@@ -1,42 +1,39 @@
-use glow::{self as gl, HasContext};
-
 use super::PipelineStage;
 use crate::{
     components::Renderable,
+    graphics::{
+        self,
+        framebuffer::{FramebufferAttachment, FramebufferAttachmentConfig, InternalFormat},
+        shader::Program,
+        state::RasteriserState,
+        AccessModifier, Barriers,
+    },
     math::Vec4f,
     memory_manager::{
-        memory_manager::{DrawElementsIndirectCommand, MemoryManager, DRAW_COMMAND_SIZE},
+        memory_manager::MemoryManager,
         uniform_layouts::{
             GeneralPurposeIndexStorageBuffer, GeneralPurposeStorageBuffer,
             GeneralPurposeVecStorageBuffer,
         },
     },
-    renderer::state::{RasteriserState, RendererState},
-    resource_manager::{
-        framebuffer::FramebufferAttachment,
-        resource_manager::{FramebufferID, MeshID, ResourcesManager, ShaderProgramID},
-    },
+    platform::rustgl,
+    renderer::state::RendererState,
+    resource_manager::resource_manager::{FramebufferID, ResourcesManager, ShaderProgramID},
 };
 
-pub struct BloomStage<'a> {
-    gl: &'a gl::Context,
+pub struct BloomStage {
     target: FramebufferID,
     upsample_shader_id: ShaderProgramID,
     downsample_shader_id: ShaderProgramID,
 }
 
-impl<'a> BloomStage<'a> {
-    pub fn new(
-        gl: &'a gl::Context,
-        target: FramebufferID,
-        resources_manager: &mut ResourcesManager<'a>,
-    ) -> Self {
+impl BloomStage {
+    pub fn new(target: FramebufferID, resources_manager: &mut ResourcesManager) -> Self {
         let downsample_shader_id =
             resources_manager.load_shader("res/shaders/bloom_downsample.glsl");
         let upsample_shader_id = resources_manager.load_shader("res/shaders/bloom_upsample.glsl");
 
         Self {
-            gl,
             target,
             upsample_shader_id,
             downsample_shader_id,
@@ -44,7 +41,7 @@ impl<'a> BloomStage<'a> {
     }
 }
 
-impl<'a> PipelineStage for BloomStage<'a> {
+impl PipelineStage for BloomStage {
     fn get_target(&self) -> FramebufferID {
         self.target
     }
@@ -64,17 +61,19 @@ impl<'a> PipelineStage for BloomStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        rasteriser_state: &mut RasteriserState,
         renderables: &[Renderable],
     ) {
         let fb = resources_manager.borrow_framebuffer(&self.target).unwrap();
-        let texture = fb.get_colour_texture_handle().unwrap();
 
-        unsafe {
-            self.gl.active_texture(gl::TEXTURE0);
-            self.gl.bind_texture(gl::TEXTURE_2D, Some(texture));
+        if let FramebufferAttachment::Texture(texture) = &fb.colour_handle {
+            unsafe {
+                rustgl::active_texture(rustgl::TEXTURE0);
+            }
+            texture.bind()
         }
 
-        if let FramebufferAttachment::Texture { levels, .. } = fb.config.colour {
+        if let FramebufferAttachmentConfig::Texture { levels, .. } = fb.config.colour {
             renderer_state.set_shader_program(self.downsample_shader_id, resources_manager);
             for level in 0..(levels - 1) {
                 self.downsample(memory_manager, resources_manager, level);
@@ -88,7 +87,7 @@ impl<'a> PipelineStage for BloomStage<'a> {
     }
 }
 
-impl BloomStage<'_> {
+impl BloomStage {
     fn downsample(
         &mut self,
         memory_manager: &mut MemoryManager,
@@ -96,7 +95,6 @@ impl BloomStage<'_> {
         read_mip: u32,
     ) {
         let fb = resources_manager.borrow_framebuffer(&self.target).unwrap();
-        let texture = fb.get_colour_texture_handle().unwrap();
 
         // 64 threads per subgroup, one per written pixel, so calculate number of subgroups based on resolution of
         // write mip level which is one higher
@@ -122,20 +120,18 @@ impl BloomStage<'_> {
             },
         });
 
-        unsafe {
-            self.gl.bind_image_texture(
+        if let FramebufferAttachment::Texture(ref texture) = fb.colour_handle {
+            texture.bind_image_unit(
                 1,
-                texture,
-                (read_mip + 1) as i32,
-                false,
+                read_mip + 1,
                 0,
-                gl::WRITE_ONLY,
-                gl::RGBA16F,
-            );
-
-            self.gl.dispatch_compute(blocks_w, blocks_h, 1);
-            self.gl.memory_barrier(gl::SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                AccessModifier::WriteOnly,
+                InternalFormat::RGBA16F,
+            )
         }
+
+        Program::dispatch_compute(blocks_w, blocks_h, 1);
+        graphics::memory_barrier(Barriers::ShaderImageAccess as u32);
     }
 
     fn upsample(
@@ -145,7 +141,6 @@ impl BloomStage<'_> {
         read_mip: u32,
     ) {
         let fb = resources_manager.borrow_framebuffer(&self.target).unwrap();
-        let texture = fb.get_colour_texture_handle().unwrap();
 
         // 64 threads per subgroup, one per written pixel, so calculate number of subgroups based on resolution of
         // write mip level which is one lower
@@ -171,19 +166,17 @@ impl BloomStage<'_> {
             },
         });
 
-        unsafe {
-            self.gl.bind_image_texture(
+        if let FramebufferAttachment::Texture(ref texture) = fb.colour_handle {
+            texture.bind_image_unit(
                 1,
-                texture,
-                (read_mip - 1) as i32,
-                false,
+                read_mip - 1,
                 0,
-                gl::READ_WRITE,
-                gl::RGBA16F,
-            );
-
-            self.gl.dispatch_compute(blocks_w, blocks_h, 1);
-            self.gl.memory_barrier(gl::SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                AccessModifier::ReadWrite,
+                InternalFormat::RGBA16F,
+            )
         }
+
+        Program::dispatch_compute(blocks_w, blocks_h, 1);
+        graphics::memory_barrier(Barriers::ShaderImageAccess as u32);
     }
 }

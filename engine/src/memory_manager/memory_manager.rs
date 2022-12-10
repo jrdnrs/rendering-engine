@@ -1,14 +1,14 @@
 use std::mem::size_of;
 
 use bytemuck::Pod;
-use glow::{self as gl, HasContext};
 use log::info;
 use memoffset::offset_of;
 
-use super::{buffer::*, uniform_layouts::*};
+use super::uniform_layouts::*;
 use crate::{
+    graphics::{buffer::*, shader::ShaderDataType},
     math::{Mat4f, Vec3f},
-    resource_manager::{model::VERTEX_SIZE, shader::ShaderDataType},
+    resource_manager::model::VERTEX_SIZE,
 };
 
 /// The number of sections in each buffer
@@ -52,20 +52,19 @@ pub struct InstanceData {
     pub transform: Mat4f,
 }
 
-pub struct MemoryManager<'a> {
-    gl: &'a gl::Context,
-    vertex_array: VertexArray<'a>,
-    indirect_draw_buffer: BufferStorage<'a>,
+pub struct MemoryManager {
+    vertex_array: VertexArray,
+    indirect_draw_buffer: BufferStorage,
 
-    static_shader_storage_buffer: BufferStorage<'a>,
-    frame_shader_storage_buffer: BufferStorage<'a>,
-    draw_shader_storage_buffer: BufferStorage<'a>,
+    static_shader_storage_buffer: BufferStorage,
+    frame_shader_storage_buffer: BufferStorage,
+    draw_shader_storage_buffer: BufferStorage,
 
-    buffer_lock: BufferLockManager<'a>,
+    buffer_lock: BufferLockManager,
 }
 
-impl<'a> MemoryManager<'a> {
-    pub fn new(gl: &'a gl::Context) -> Self {
+impl MemoryManager {
+    pub fn new() -> Self {
         let buffer_layouts = vec![
             BufferLayout::new(
                 vec![
@@ -91,37 +90,32 @@ impl<'a> MemoryManager<'a> {
             ),
         ];
 
-        let vertex_array = VertexArray::new(gl, buffer_layouts, MAX_VERTICES * 3 * 4, BUFFERS);
+        let vertex_array = VertexArray::new(buffer_layouts, MAX_VERTICES * 3 * 4, BUFFERS);
 
         let mm = Self {
-            gl,
             vertex_array,
             indirect_draw_buffer: BufferStorage::new(
-                gl,
-                gl::DRAW_INDIRECT_BUFFER,
+                BufferType::DrawIndirectCommand,
                 INDIRECT_BUFFER_SIZE,
                 BUFFERS,
             ),
 
             static_shader_storage_buffer: BufferStorage::new(
-                gl,
-                gl::UNIFORM_BUFFER,
+                BufferType::Uniform,
                 STATIC_SHADER_STORAGE_BUFFER_SIZE,
                 1,
             ),
             frame_shader_storage_buffer: BufferStorage::new(
-                gl,
-                gl::UNIFORM_BUFFER,
+                BufferType::Uniform,
                 FRAME_SHADER_STORAGE_BUFFER_SIZE,
                 BUFFERS,
             ),
             draw_shader_storage_buffer: BufferStorage::new(
-                gl,
-                gl::UNIFORM_BUFFER,
+                BufferType::Uniform,
                 DRAW_SHADER_STORAGE_BUFFER_SIZE,
                 1,
             ),
-            buffer_lock: BufferLockManager::new(gl),
+            buffer_lock: BufferLockManager::new(),
         };
 
         mm.indirect_draw_buffer.bind();
@@ -168,57 +162,41 @@ impl<'a> MemoryManager<'a> {
     ///////////////////////////////////////////////////////////////////////////////////////
 
     fn bind_static_shader_storage_ranges(&self) {
-        unsafe {
-            self.gl.bind_buffer_range(
-                gl::UNIFORM_BUFFER,
-                0,
-                Some(self.static_shader_storage_buffer.handle),
-                offset_of!(StaticShaderStorageBuffers, materials) as i32,
-                size_of::<MaterialsStorageBuffer>() as i32,
-            );
+        self.static_shader_storage_buffer.bind_buffer_range(
+            0,
+            offset_of!(StaticShaderStorageBuffers, materials) as u32,
+            size_of::<MaterialsStorageBuffer>() as u32,
+        );
 
-            self.gl.bind_buffer_range(
-                gl::UNIFORM_BUFFER,
-                1,
-                Some(self.static_shader_storage_buffer.handle),
-                offset_of!(StaticShaderStorageBuffers, shadow_maps) as i32,
-                size_of::<ShadowMapStorageBuffer>() as i32,
-            );
-        }
+        self.static_shader_storage_buffer.bind_buffer_range(
+            1,
+            offset_of!(StaticShaderStorageBuffers, shadow_maps) as u32,
+            size_of::<ShadowMapStorageBuffer>() as u32,
+        );
     }
 
     fn bind_frame_shader_storage_ranges(&self) {
-        unsafe {
-            self.gl.bind_buffer_range(
-                gl::UNIFORM_BUFFER,
-                2,
-                Some(self.frame_shader_storage_buffer.handle),
-                offset_of!(FrameShaderStorageBuffers, lights) as i32
-                    + self.frame_shader_storage_buffer.buffer_section_offset as i32,
-                size_of::<LightsStorageBuffer>() as i32,
-            );
+        self.frame_shader_storage_buffer.bind_buffer_range(
+            2,
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + self.frame_shader_storage_buffer.buffer_section_offset,
+            size_of::<LightsStorageBuffer>() as u32,
+        );
 
-            self.gl.bind_buffer_range(
-                gl::UNIFORM_BUFFER,
-                3,
-                Some(self.frame_shader_storage_buffer.handle),
-                offset_of!(FrameShaderStorageBuffers, matrices) as i32
-                    + self.frame_shader_storage_buffer.buffer_section_offset as i32,
-                size_of::<MatricesStorageBuffer>() as i32,
-            );
-        }
+        self.frame_shader_storage_buffer.bind_buffer_range(
+            3,
+            offset_of!(FrameShaderStorageBuffers, matrices) as u32
+                + self.frame_shader_storage_buffer.buffer_section_offset,
+            size_of::<MatricesStorageBuffer>() as u32,
+        );
     }
 
     fn bind_draw_shader_storage_ranges(&self) {
-        unsafe {
-            self.gl.bind_buffer_range(
-                gl::UNIFORM_BUFFER,
-                4,
-                Some(self.draw_shader_storage_buffer.handle),
-                self.draw_shader_storage_buffer.current_buffer_index() as i32,
-                size_of::<GeneralPurposeStorageBuffer>() as i32,
-            );
-        }
+        self.draw_shader_storage_buffer.bind_buffer_range(
+            4,
+            self.draw_shader_storage_buffer.current_buffer_index(),
+            size_of::<GeneralPurposeStorageBuffer>() as u32,
+        );
     }
 
     pub fn advance_sections(&mut self) {
@@ -255,7 +233,7 @@ impl<'a> MemoryManager<'a> {
     }
 
     pub fn get_vertex_index(&mut self) -> u32 {
-        (self.vertex_array.vertex_buffers[0].current_buffer_index() / VERTEX_SIZE) as u32
+        self.vertex_array.vertex_buffers[0].current_buffer_index() / VERTEX_SIZE
     }
 
     pub fn push_vertex_data<T>(&mut self, data: &T) {
@@ -274,7 +252,7 @@ impl<'a> MemoryManager<'a> {
     }
 
     pub fn get_instance_index(&mut self) -> u32 {
-        (self.vertex_array.vertex_buffers[1].current_buffer_index() / INSTANCE_DATA_SIZE) as u32
+        self.vertex_array.vertex_buffers[1].current_buffer_index() / INSTANCE_DATA_SIZE
     }
 
     pub fn push_instance_data<T>(&mut self, data: &T) {
@@ -293,7 +271,7 @@ impl<'a> MemoryManager<'a> {
     }
 
     pub fn get_index_index(&mut self) -> u32 {
-        (self.vertex_array.index_buffer.current_buffer_index() / 4) as u32
+        self.vertex_array.index_buffer.current_buffer_index() / 4
     }
 
     pub fn push_index_data<T>(&mut self, data: &T) {
@@ -313,7 +291,7 @@ impl<'a> MemoryManager<'a> {
     }
 
     pub fn get_indirect_command_index(&mut self) -> u32 {
-        (self.indirect_draw_buffer.current_buffer_index() / DRAW_COMMAND_SIZE) as u32
+        self.indirect_draw_buffer.current_buffer_index() / DRAW_COMMAND_SIZE
     }
 
     pub fn push_indirect_command(&mut self, command: DrawElementsIndirectCommand) {
@@ -323,38 +301,38 @@ impl<'a> MemoryManager<'a> {
     // Static Shader Storage Buffer
     ///////////////////////////////////////////////////////////////////////////////////////
 
-    pub fn set_material_data(&mut self, material: Material, index: usize) {
+    pub fn set_material_data(&mut self, material: Material, index: u32) {
         self.static_shader_storage_buffer.set_data(
             &material,
-            offset_of!(StaticShaderStorageBuffers, materials)
-                + offset_of!(MaterialsStorageBuffer, materials)
-                + size_of::<Material>() * index,
+            offset_of!(StaticShaderStorageBuffers, materials) as u32
+                + offset_of!(MaterialsStorageBuffer, materials) as u32
+                + (size_of::<Material>() as u32 * index),
         );
     }
 
     pub fn set_directional_shadow_map(&mut self, texture_handle: u64) {
         self.static_shader_storage_buffer.set_data(
             &texture_handle,
-            offset_of!(StaticShaderStorageBuffers, shadow_maps)
-                + offset_of!(ShadowMapStorageBuffer, directional_shadow_map),
+            offset_of!(StaticShaderStorageBuffers, shadow_maps) as u32
+                + offset_of!(ShadowMapStorageBuffer, directional_shadow_map) as u32,
         );
     }
 
-    pub fn set_spot_shadow_map(&mut self, texture_handle: u64, index: usize) {
+    pub fn set_spot_shadow_map(&mut self, texture_handle: u64, index: u32) {
         self.static_shader_storage_buffer.set_data(
             &texture_handle,
-            offset_of!(StaticShaderStorageBuffers, shadow_maps)
-                + offset_of!(ShadowMapStorageBuffer, spot_shadow_map)
-                + size_of::<ShadowMap>() * index,
+            offset_of!(StaticShaderStorageBuffers, shadow_maps) as u32
+                + offset_of!(ShadowMapStorageBuffer, spot_shadow_map) as u32
+                + (size_of::<ShadowMap>() as u32 * index),
         );
     }
 
-    pub fn set_point_shadow_map(&mut self, texture_handle: u64, index: usize) {
+    pub fn set_point_shadow_map(&mut self, texture_handle: u64, index: u32) {
         self.static_shader_storage_buffer.set_data(
             &texture_handle,
-            offset_of!(StaticShaderStorageBuffers, shadow_maps)
-                + offset_of!(ShadowMapStorageBuffer, point_shadow_map)
-                + size_of::<ShadowMap>() * index,
+            offset_of!(StaticShaderStorageBuffers, shadow_maps) as u32
+                + offset_of!(ShadowMapStorageBuffer, point_shadow_map) as u32
+                + (size_of::<ShadowMap>() as u32 * index),
         );
     }
 
@@ -364,56 +342,56 @@ impl<'a> MemoryManager<'a> {
     //// Point Lights
     ////////////////////////////
 
-    pub fn set_point_light_data(&mut self, light: PointLight, index: usize) {
+    pub fn set_point_light_data(&mut self, light: PointLight, index: u32) {
         self.frame_shader_storage_buffer.set_data(
             &light,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, point_lights)
-                + size_of::<PointLight>() * index,
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, point_lights) as u32
+                + (size_of::<PointLight>() as u32 * index),
         );
     }
 
     pub fn set_point_light_data_slice(&mut self, light: &[PointLight]) {
         self.frame_shader_storage_buffer.set_data_slice(
             light,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, point_lights),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, point_lights) as u32,
         );
     }
 
     pub fn set_point_light_count(&mut self, count: u32) {
         self.frame_shader_storage_buffer.set_data(
             &count,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, point_light_count),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, point_light_count) as u32,
         );
     }
 
     //// Spot Lights
     ////////////////////////////
 
-    pub fn set_spot_light_data(&mut self, light: SpotLight, index: usize) {
+    pub fn set_spot_light_data(&mut self, light: SpotLight, index: u32) {
         self.frame_shader_storage_buffer.set_data(
             &light,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, spot_lights)
-                + size_of::<SpotLight>() * index,
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, spot_lights) as u32
+                + (size_of::<SpotLight>() as u32 * index),
         );
     }
 
     pub fn set_spot_light_data_slice(&mut self, light: &[SpotLight]) {
         self.frame_shader_storage_buffer.set_data_slice(
             light,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, spot_lights),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, spot_lights) as u32,
         );
     }
 
     pub fn set_spot_light_count(&mut self, count: u32) {
         self.frame_shader_storage_buffer.set_data(
             &count,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, spot_light_count),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, spot_light_count) as u32,
         );
     }
 
@@ -423,16 +401,16 @@ impl<'a> MemoryManager<'a> {
     pub fn set_directional_light_data(&mut self, light: DirectionalLight) {
         self.frame_shader_storage_buffer.set_data(
             &light,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, directional_light),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, directional_light) as u32,
         );
     }
 
     pub fn set_directional_light_count(&mut self, count: u32) {
         self.frame_shader_storage_buffer.set_data(
             &count,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, directional_light_count),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, directional_light_count) as u32,
         );
     }
 
@@ -442,16 +420,16 @@ impl<'a> MemoryManager<'a> {
     pub fn set_projection_matrix(&mut self, projection_matrix: Mat4f) {
         self.frame_shader_storage_buffer.set_data(
             &projection_matrix,
-            offset_of!(FrameShaderStorageBuffers, matrices)
-                + offset_of!(MatricesStorageBuffer, projection),
+            offset_of!(FrameShaderStorageBuffers, matrices) as u32
+                + offset_of!(MatricesStorageBuffer, projection) as u32,
         );
     }
 
     pub fn set_view_matrix(&mut self, view_matrix: Mat4f) {
         self.frame_shader_storage_buffer.set_data(
             &view_matrix,
-            offset_of!(FrameShaderStorageBuffers, matrices)
-                + offset_of!(MatricesStorageBuffer, view),
+            offset_of!(FrameShaderStorageBuffers, matrices) as u32
+                + offset_of!(MatricesStorageBuffer, view) as u32,
         );
     }
 
@@ -461,16 +439,16 @@ impl<'a> MemoryManager<'a> {
     pub fn set_camera_direction(&mut self, direction: Vec3f) {
         self.frame_shader_storage_buffer.set_data(
             &direction,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, camera_dir),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, camera_dir) as u32,
         );
     }
 
     pub fn set_camera_position(&mut self, position: Vec3f) {
         self.frame_shader_storage_buffer.set_data(
             &position,
-            offset_of!(FrameShaderStorageBuffers, lights)
-                + offset_of!(LightsStorageBuffer, camera_pos),
+            offset_of!(FrameShaderStorageBuffers, lights) as u32
+                + offset_of!(LightsStorageBuffer, camera_pos) as u32,
         );
     }
 
@@ -491,8 +469,8 @@ impl<'a> MemoryManager<'a> {
         self.bind_draw_shader_storage_ranges();
         self.draw_shader_storage_buffer.set_data(
             &data,
-            self.draw_shader_storage_buffer.current_buffer_index() as usize
-                + offset_of!(GeneralPurposeStorageBuffer, indices),
+            self.draw_shader_storage_buffer.current_buffer_index()
+                + offset_of!(GeneralPurposeStorageBuffer, indices) as u32,
         );
         self.draw_shader_storage_buffer
             .increase_index(std::mem::size_of::<GeneralPurposeStorageBuffer>() as u32);
@@ -502,8 +480,8 @@ impl<'a> MemoryManager<'a> {
         self.bind_draw_shader_storage_ranges();
         self.draw_shader_storage_buffer.set_data(
             &data,
-            self.draw_shader_storage_buffer.current_buffer_index() as usize
-                + offset_of!(GeneralPurposeStorageBuffer, vecs),
+            self.draw_shader_storage_buffer.current_buffer_index()
+                + offset_of!(GeneralPurposeStorageBuffer, vecs) as u32,
         );
         self.draw_shader_storage_buffer
             .increase_index(std::mem::size_of::<GeneralPurposeStorageBuffer>() as u32);

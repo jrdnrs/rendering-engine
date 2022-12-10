@@ -6,8 +6,8 @@ use std::{
 use image::{self, DynamicImage::*};
 
 #[cfg(feature = "opengl")]
-pub use super::opengl::texture::{ImageDataType, ImageFormat};
-use super::texture::Image;
+pub use super::opengl::texture::{ImageFormat};
+use super::{texture::Image, DataType};
 
 fn as_u32_le(array: &[u8; 4]) -> u32 {
     ((array[0] as u32) << 0)
@@ -196,23 +196,23 @@ impl Image {
             return Ok(Self {
                 path,
                 format,
-                data_type: ImageDataType::NA, // unused
+                data_type: DataType::NA, // unused
                 compressed: true,
-                mipmap_count: bptc_image.header.mipmap_count as usize,
-                width: bptc_image.header.width as usize,
-                height: bptc_image.header.height as usize,
+                mipmap_count: bptc_image.header.mipmap_count,
+                width: bptc_image.header.width,
+                height: bptc_image.header.height,
                 bytes: bptc_image.bytes,
             });
         }
 
         if let Ok(image) = image::open(path) {
             let (format, data_type) = match image {
-                ImageRgb8(_) => (ImageFormat::RGB, ImageDataType::UnsignedByte),
-                ImageRgba8(_) => (ImageFormat::RGBA, ImageDataType::UnsignedByte),
-                ImageRgb16(_) => (ImageFormat::RGB, ImageDataType::UnsignedShort),
-                ImageRgba16(_) => (ImageFormat::RGBA,  ImageDataType::UnsignedShort),
-                ImageRgb32F(_) => (ImageFormat::RGB,  ImageDataType::Float),
-                ImageRgba32F(_) => (ImageFormat::RGBA, ImageDataType::Float),
+                ImageRgb8(_) => (ImageFormat::RGB, DataType::Uint8),
+                ImageRgba8(_) => (ImageFormat::RGBA, DataType::Uint8),
+                ImageRgb16(_) => (ImageFormat::RGB, DataType::Uint16),
+                ImageRgba16(_) => (ImageFormat::RGBA,  DataType::Uint16),
+                ImageRgb32F(_) => (ImageFormat::RGB,  DataType::Float32),
+                ImageRgba32F(_) => (ImageFormat::RGBA, DataType::Float32),
                 _ => {
                     return Err(io::Error::from(ErrorKind::InvalidData));
                 }
@@ -225,8 +225,8 @@ impl Image {
                 data_type,
                 compressed: false,
                 mipmap_count: 1,
-                width: image.width() as usize,
-                height: image.height() as usize,
+                width: image.width(),
+                height: image.height(),
                 bytes: image.as_bytes().to_vec(),
             });
         }

@@ -1,9 +1,21 @@
 use log::error;
 
+use super::{framebuffer::InternalFormat, AccessModifier, DataType};
 use crate::{
-    graphics::{graphics::ApiEnum, texture::*},
+    graphics::{
+        graphics::ApiEnum,
+        texture::{Image, Texture, TextureConfig},
+    },
     platform::rustgl as gl,
 };
+
+#[derive(Clone, Copy)]
+pub enum TextureType {
+    T2D = gl::TEXTURE_2D as isize,
+    T2DArray = gl::TEXTURE_2D_ARRAY as isize,
+    T3D = gl::TEXTURE_3D as isize,
+    CubeMap = gl::TEXTURE_CUBE_MAP as isize,
+}
 
 #[derive(Clone, Copy)]
 pub enum TextureFilter {
@@ -18,14 +30,6 @@ pub enum TextureWrap {
     Repeat = gl::REPEAT as isize,
     MirrorRepeat = gl::MIRRORED_REPEAT as isize,
     MirrorClampToEdge = gl::MIRROR_CLAMP_TO_EDGE as isize,
-}
-
-#[derive(Clone, Copy)]
-pub enum ImageDataType {
-    UnsignedByte = gl::UNSIGNED_BYTE as isize,
-    UnsignedShort = gl::UNSIGNED_SHORT as isize,
-    Float = gl::FLOAT as isize,
-    NA,
 }
 
 #[derive(Clone, Copy)]
@@ -47,50 +51,60 @@ fn gl_mipmap_filter(filter: TextureFilter) -> ApiEnum {
     }
 }
 
-fn derive_gl_internal_format(format: ApiEnum, data_type: ApiEnum, srgb: bool) -> ApiEnum {
+fn derive_gl_internal_format(
+    format: ImageFormat,
+    data_type: DataType,
+    srgb: bool,
+) -> InternalFormat {
     if srgb {
         match format {
-            gl::RGB => gl::SRGB8,
-            gl::RGBA => gl::SRGB8_ALPHA8,
-            gl::COMPRESSED_RGBA_BPTC_UNORM => gl::COMPRESSED_SRGB_ALPHA_BPTC_UNORM,
+            ImageFormat::RGB => InternalFormat::SRGB8,
+            ImageFormat::RGBA => InternalFormat::SRGB8A8,
+            ImageFormat::Bc7UnsignedNormalised => InternalFormat::Bc7UnsignedNormalisedSRGB,
             _ => {
-                error!("Failed to find SRGB equivalent for '{}'", format);
-                format
+                // error!("Failed to find SRGB equivalent for '{}'", format);
+                // format
+                panic!();
             }
         }
     } else {
         match format {
-            gl::RGB => match data_type {
-                gl::UNSIGNED_BYTE => gl::RGB8,
-                gl::UNSIGNED_SHORT => gl::RGB16,
-                gl::FLOAT => gl::RGB32F,
+            ImageFormat::RGB => match data_type {
+                DataType::Uint8 => InternalFormat::RGB8,
+                DataType::Uint16 => InternalFormat::RGB16,
+                DataType::Float32 => InternalFormat::RGB32F,
                 _ => {
-                    error!(
-                        "Failed to determine internal format based on data type '{}'",
-                        data_type
-                    );
+                    // error!(
+                    //     "Failed to determine internal format based on data type '{}'",
+                    //     data_type
+                    // );
                     panic!();
                 }
             },
-            gl::RGBA => match data_type {
-                gl::UNSIGNED_BYTE => gl::RGBA8,
-                gl::UNSIGNED_SHORT => gl::RGBA16,
-                gl::FLOAT => gl::RGBA32F,
+            ImageFormat::RGBA => match data_type {
+                DataType::Uint8 => InternalFormat::RGBA8,
+                DataType::Uint16 => InternalFormat::RGBA16,
+                DataType::Float32 => InternalFormat::RGBA32F,
                 _ => {
-                    error!(
-                        "Failed to determine internal format based on data type '{}'",
-                        data_type
-                    );
+                    // error!(
+                    //     "Failed to determine internal format based on data type '{}'",
+                    //     data_type
+                    // );
                     panic!();
                 }
             },
-            _ => format,
+            ImageFormat::Bc6hUnsignedFloat16 => InternalFormat::Bc6hUnsigned16F,
+            ImageFormat::Bc6hSignedFloat16 => InternalFormat::Bc6hSigned16F,
+            ImageFormat::Bc7UnsignedNormalised => InternalFormat::Bc7UnsignedNormalised,
+            ImageFormat::Bc7UnsignedNormalisedSrgb => InternalFormat::Bc7UnsignedNormalisedSRGB,
         }
     }
 }
 
+
+
 impl Texture {
-    pub fn new_2d(&self, image: Image, config: &TextureConfig) -> Texture {
+    pub fn new_2d(image: Image, config: &TextureConfig) -> Texture {
         let target = gl::TEXTURE_2D;
         let config = config.clone();
 
@@ -98,15 +112,14 @@ impl Texture {
         let height = image.height;
         let data_type = image.data_type;
         let format = image.format;
-        let internal_format =
-            derive_gl_internal_format(format as u32, data_type as u32, config.srgb);
+        let internal_format = derive_gl_internal_format(format, data_type, config.srgb);
 
         let handle = unsafe {
             let handle = gl::create_named_texture(target).unwrap();
             gl::texture_storage_2d(
                 handle,
                 image.mipmap_count as i32,
-                internal_format,
+                internal_format as u32,
                 width as i32,
                 height as i32,
             );
@@ -139,7 +152,7 @@ impl Texture {
                         0,
                         level_w as i32,
                         level_h as i32,
-                        internal_format,
+                        internal_format as u32,
                         gl::CompressedPixelUnpackData::Slice(
                             &image.bytes
                                 [level_offset as usize..(level_offset + level_size) as usize],
@@ -183,24 +196,25 @@ impl Texture {
         Texture {
             config,
             handle: handle.0,
+            shader_texture_handle: None,
+            resident: false,
             target,
             internal_format,
-            format: format as u32,
-            data_type: data_type as u32,
+            format,
+            data_type,
             width,
             height,
         }
     }
 
-    pub fn new_cubemap(&self, images: [Image; 6], config: &TextureConfig) -> Texture {
+    pub fn new_cubemap(images: [Image; 6], config: &TextureConfig) -> Texture {
         let target = gl::TEXTURE_CUBE_MAP;
         let config = config.clone();
 
         // TODO: Ensure that all images have same format/dimensions
         let data_type = images[0].data_type;
         let format = images[0].format;
-        let internal_format =
-            derive_gl_internal_format(format as u32, data_type as u32, config.srgb);
+        let internal_format = derive_gl_internal_format(format, data_type, config.srgb);
 
         let width = images[0].width;
         let height = images[0].height;
@@ -210,7 +224,7 @@ impl Texture {
             gl::texture_storage_2d(
                 handle,
                 images[0].mipmap_count as i32,
-                internal_format,
+                internal_format as u32,
                 width as i32,
                 height as i32,
             );
@@ -248,7 +262,7 @@ impl Texture {
                             level_w as i32,
                             level_h as i32,
                             1,
-                            internal_format,
+                            internal_format as u32,
                             gl::CompressedPixelUnpackData::Slice(
                                 &image.bytes
                                     [level_offset as usize..(level_offset + level_size) as usize],
@@ -298,31 +312,175 @@ impl Texture {
         Texture {
             config,
             handle: handle.0,
+            shader_texture_handle: None,
             target,
+            resident: false,
             internal_format,
-            format: format as u32,
-            data_type: data_type as u32,
+            format,
+            data_type,
             width,
             height,
         }
     }
 
-    pub fn bind(&self, texture: &Texture) {
-        unsafe {
-            gl::bind_texture(texture.target, Some(gl::GlTexture(texture.handle)));
+    pub fn new_framebuffer_texture(
+        target: TextureType,
+        internal_format: InternalFormat,
+        layers: u32,
+        levels: u32,
+        samples: u32,
+        width: u32,
+        height: u32,
+        config: &TextureConfig,
+    ) -> Texture {
+        let is_multisample = samples > 1;
+
+        // TODO: take into account is_multisample, needs different target
+        let handle = unsafe {
+            gl::create_named_texture(target as u32).unwrap()
+        };
+
+        if is_multisample {
+            unsafe {
+                gl::texture_storage_2d_multisample(
+                    handle,
+                    samples as i32,
+                    internal_format as u32,
+                    width as i32,
+                    height as i32,
+                    true,
+                );
+            }
+        } else {
+            unsafe {
+                match target {
+                    TextureType::T2DArray => {
+                        gl::texture_storage_3d(
+                            handle,
+                            levels as i32,
+                            internal_format as u32,
+                            width as i32,
+                            height as i32,
+                            layers as i32,
+                        );
+                    }
+                    _ => {
+                        gl::texture_storage_2d(
+                            handle,
+                            levels as i32,
+                            internal_format as u32,
+                            width as i32,
+                            height as i32,
+                        );
+                    }
+                }
+
+                let min_filter = if config.mipmap {
+                    gl_mipmap_filter(config.min_filter)
+                } else {
+                    config.min_filter as u32
+                };
+
+                gl::texture_parameter_i32(handle, gl::TEXTURE_MIN_FILTER, min_filter as i32);
+                gl::texture_parameter_i32(handle, gl::TEXTURE_MAG_FILTER, config.mag_filter as i32);
+                gl::texture_parameter_i32(handle, gl::TEXTURE_WRAP_S, config.wrap as i32);
+                gl::texture_parameter_i32(handle, gl::TEXTURE_WRAP_T, config.wrap as i32);
+                gl::texture_parameter_i32(handle, gl::TEXTURE_WRAP_R, config.wrap as i32);
+                gl::texture_parameter_i32(
+                    handle,
+                    gl::TEXTURE_COMPARE_MODE,
+                    gl::COMPARE_REF_TO_TEXTURE as i32,
+                );
+                gl::texture_parameter_i32(handle, gl::TEXTURE_COMPARE_FUNC, gl::GREATER as i32);
+            }
+        }
+
+        Texture {
+            config: config.clone(),
+            handle: handle.0,
+            shader_texture_handle: None,
+            target: target as u32,
+            resident: false,
+            internal_format,
+            format: ImageFormat::RGBA,
+            data_type: DataType::Float32,
+            width,
+            height,
         }
     }
 
-    pub fn unbind(&self, texture: &Texture) {
-        unsafe {
-            gl::bind_texture(texture.target, None);
+    pub fn get_shader_texture_handle(&mut self) -> u64 {
+        if let Some(shader_texture_handle) = self.shader_texture_handle {
+            return shader_texture_handle;
+        } else {
+            let shader_texture_handle =
+                unsafe { gl::get_texture_handle(gl::GlTexture(self.handle)).0.get() };
+            self.shader_texture_handle = Some(shader_texture_handle);
+            return shader_texture_handle;
         }
     }
 
-    pub fn delete(&self, texture: &Texture) {
-        self.unbind(texture);
+    pub fn make_texture_resident(&mut self) {
+        if !self.resident {
+            let shader_texture_handle = self.get_shader_texture_handle();
+            unsafe {
+                gl::make_texture_handle_resident(gl::GlTextureHandle(
+                    std::num::NonZeroU64::new(shader_texture_handle).unwrap(),
+                ))
+            }
+            self.resident = true;
+        }
+    }
+
+    pub fn make_texture_non_resident(&mut self) {
+        if self.resident {
+            let shader_texture_handle = self.get_shader_texture_handle();
+            unsafe {
+                gl::make_texture_handle_non_resident(gl::GlTextureHandle(
+                    std::num::NonZeroU64::new(shader_texture_handle).unwrap(),
+                ))
+            }
+            self.resident = false;
+        }
+    }
+
+    pub fn bind_image_unit(
+        &self,
+        unit: u32,
+        level: u32,
+        layer: u32,
+        access: AccessModifier,
+        format: InternalFormat,
+    ) {
         unsafe {
-            gl::delete_texture(gl::GlTexture(texture.handle));
+            gl::bind_image_texture(
+                unit,
+                gl::GlTexture(self.handle),
+                level as i32,
+                layer > 0,
+                layer as i32,
+                access as u32,
+                format as u32,
+            );
+        }
+    }
+
+    pub fn bind(&self) {
+        unsafe {
+            gl::bind_texture(self.target, Some(gl::GlTexture(self.handle)));
+        }
+    }
+
+    pub fn unbind(&self) {
+        unsafe {
+            gl::bind_texture(self.target, None);
+        }
+    }
+
+    pub fn delete(&self) {
+        self.unbind();
+        unsafe {
+            gl::delete_texture(gl::GlTexture(self.handle));
         }
     }
 }

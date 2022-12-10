@@ -1,30 +1,29 @@
-use glow::{self as gl, HasContext};
-
 use super::PipelineStage;
 use crate::{
     components::Renderable,
-    math::{Mat4f, Vec3f},
+    graphics::{
+        self,
+        framebuffer::{
+            FramebufferAttachment, FramebufferAttachmentConfig, FramebufferConfig, InternalFormat,
+        },
+        state::{Orientation, RasteriserState},
+        texture::TextureType,
+        DataType, DrawMode,
+    },
+    math::Mat4f,
     memory_manager::{
         memory_manager::{
             DrawElementsIndirectCommand, InstanceData, MemoryManager, DRAW_COMMAND_SIZE,
         },
         uniform_layouts::{GeneralPurposeIndexStorageBuffer, MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS},
     },
-    renderer::{
-        camera::Camera,
-        command::DrawCommands,
-        state::{RasteriserState, RendererState},
-    },
-    resource_manager::{
-        framebuffer::{Framebuffer, FramebufferAttachment, FramebufferConfig, TextureType},
-        resource_manager::{
-            FramebufferID, MaterialID, MeshID, ResourceIDTrait, ResourcesManager, ShaderProgramID,
-        },
+    renderer::{command::DrawCommands, state::RendererState},
+    resource_manager::resource_manager::{
+        FramebufferID, ResourceIDTrait, ResourcesManager, ShaderProgramID, MeshID, MaterialID,
     },
 };
 
-pub struct ShadowStage<'a> {
-    gl: &'a gl::Context,
+pub struct ShadowStage {
     target: FramebufferID,
     dir_shadow_shader_id: ShaderProgramID,
     omni_shadow_shader_id: ShaderProgramID,
@@ -38,20 +37,19 @@ pub struct ShadowStage<'a> {
     pending_indirect_command_count: u32,
 }
 
-impl<'a> ShadowStage<'a> {
+impl ShadowStage {
     pub fn new(
-        gl: &'a gl::Context,
         target: FramebufferID,
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
     ) -> Self {
         let dir_config = FramebufferConfig {
-            depth: FramebufferAttachment::Texture {
+            depth: FramebufferAttachmentConfig::Texture {
                 target: TextureType::T2D,
-                internal_format: gl::DEPTH_COMPONENT32F,
+                internal_format: InternalFormat::Depth32F,
                 layers: 1,
-                levels: 1
+                levels: 1,
             },
             width: 4096,
             height: 4096,
@@ -59,11 +57,11 @@ impl<'a> ShadowStage<'a> {
         };
 
         let omni_config = FramebufferConfig {
-            depth: FramebufferAttachment::Texture {
+            depth: FramebufferAttachmentConfig::Texture {
                 target: TextureType::T2DArray,
-                internal_format: gl::DEPTH_COMPONENT32F,
+                internal_format: InternalFormat::Depth32F,
                 layers: 6,
-                levels: 1
+                levels: 1,
             },
             width: 512,
             height: 512,
@@ -83,13 +81,12 @@ impl<'a> ShadowStage<'a> {
         }
 
         for (i, shadow_map_id) in point_shadows.iter().enumerate() {
-            let shadow_map = resources_manager.borrow_framebuffer(shadow_map_id).unwrap();
+            let shadow_map = resources_manager.borrow_mut_framebuffer(shadow_map_id).unwrap();
 
-            let texture = shadow_map.get_depth_texture_handle().unwrap();
-            let texture_handle = unsafe { gl.get_texture_handle(texture) };
-            unsafe { gl.make_texture_handle_resident(texture_handle) }
-
-            memory_manager.set_point_shadow_map(texture_handle.0.get(), i);
+            if let FramebufferAttachment::Texture(texture) = &mut shadow_map.depth_handle {
+                texture.make_texture_resident();
+                memory_manager.set_point_shadow_map(texture.get_shader_texture_handle(), i as u32);
+            };
         }
 
         // init and upload spot light shadow maps
@@ -100,32 +97,30 @@ impl<'a> ShadowStage<'a> {
         }
 
         for (i, shadow_map_id) in spot_shadows.iter().enumerate() {
-            let shadow_map = resources_manager.borrow_framebuffer(shadow_map_id).unwrap();
+            let shadow_map = resources_manager.borrow_mut_framebuffer(shadow_map_id).unwrap();
 
-            let texture = shadow_map.get_depth_texture_handle().unwrap();
-            let texture_handle = unsafe { gl.get_texture_handle(texture) };
-            unsafe { gl.make_texture_handle_resident(texture_handle) }
-
-            memory_manager.set_spot_shadow_map(texture_handle.0.get(), i);
+            if let FramebufferAttachment::Texture(texture) = &mut shadow_map.depth_handle {
+                texture.make_texture_resident();
+                memory_manager.set_spot_shadow_map(texture.get_shader_texture_handle(), i as u32);
+            };
         }
 
         // init and upload directional light shadow map
         let directional_shadow = resources_manager.load_framebuffer(&dir_config, false);
         let shadow_map = resources_manager
-            .borrow_framebuffer(&directional_shadow)
+            .borrow_mut_framebuffer(&directional_shadow)
             .unwrap();
 
-        let texture = shadow_map.get_depth_texture_handle().unwrap();
-        let texture_handle = unsafe { gl.get_texture_handle(texture) };
-        unsafe { gl.make_texture_handle_resident(texture_handle) }
-        memory_manager.set_directional_shadow_map(texture_handle.0.get());
+        if let FramebufferAttachment::Texture(texture) = &mut shadow_map.depth_handle {
+            texture.make_texture_resident();
+            memory_manager.set_directional_shadow_map(texture.get_shader_texture_handle());
+        };
 
         let dir_shadow_shader_id = resources_manager.load_shader("res/shaders/dir_shadow_map.glsl");
         let omni_shadow_shader_id =
             resources_manager.load_shader("res/shaders/cube_shadow_map.glsl");
 
         Self {
-            gl,
             target,
             dir_shadow_shader_id,
             omni_shadow_shader_id,
@@ -141,7 +136,7 @@ impl<'a> ShadowStage<'a> {
     }
 }
 
-impl<'a> PipelineStage for ShadowStage<'a> {
+impl PipelineStage for ShadowStage {
     fn get_target(&self) -> FramebufferID {
         self.target
     }
@@ -163,38 +158,35 @@ impl<'a> PipelineStage for ShadowStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
-        renderables: &[Renderable]
+        rasteriser_state: &mut RasteriserState,
+        renderables: &[Renderable],
     ) {
-        renderer_state.set_rasteriser_state(RasteriserState {
-            cull_face: gl::FRONT,
+        rasteriser_state.set(RasteriserState {
+            cull_face: Orientation::Front,
             ..Default::default()
         });
 
-        self.command_queue.update_keys(renderables, &self.renderable_indices);
+        self.command_queue
+            .update_keys(renderables, &self.renderable_indices);
         self.command_queue.sort_indices();
-
-        // HACK: added a dummy renderable to the end to otherwise the last renderable would be cut off
-        // when iterating through renderables with renderable and next_renderable. zip stops when one returns None
-        // self.renderables.push(Renderable {
-        //     mesh_id: MeshID::new(0xFFFF),
-        //     material_id: MaterialID::new(0xFFFF),
-        //     shader_id: ShaderProgramID::new(0xFFFF),
-        //     transform: Mat4f::identity(),
-        //     pipeline_stages: 0,
-        // });
-        // self.command_queue.indices.push(self.renderables.len() - 1);
 
         let mut instance_count = 0;
 
-        for (i, (index, next_index)) in self
-            .command_queue
-            .indices
-            .iter()
-            .zip(self.command_queue.indices[1..].iter())
-            .enumerate()
-        {
-            let renderable = &renderables[self.renderable_indices[*index]];
-            let next_renderable = &renderables[self.renderable_indices[*next_index]];
+        let r = Renderable {
+            mesh_id: MeshID::new(0xFFFF),
+            material_id: MaterialID::new(0xFFFF),
+            shader_id: ShaderProgramID::new(0xFFFF),
+            transform: Mat4f::identity(),
+            pipeline_stages: 0,
+        };
+
+        for i in 0..self.command_queue.indices.len() {
+            let renderable = &renderables[self.renderable_indices[self.command_queue.indices[i]]];
+            let next_renderable = if i == self.command_queue.indices.len() - 1 {
+                &r
+            } else {
+                &renderables[self.renderable_indices[self.command_queue.indices[i + 1]]]
+            };
 
             instance_count += 1;
 
@@ -209,7 +201,7 @@ impl<'a> PipelineStage for ShadowStage<'a> {
                 self.pending_indirect_command_count += 1;
 
                 for instance_index in
-                    self.command_queue.indices[(i - (instance_count - 1) as usize)..(i + 1)].iter()
+                    self.command_queue.indices[(i - (instance_count - 1) as usize)..=i].iter()
                 {
                     let renderable = &renderables[self.renderable_indices[*instance_index]];
 
@@ -236,15 +228,18 @@ impl<'a> PipelineStage for ShadowStage<'a> {
                 ..Default::default()
             });
 
-            let fb = resources_manager
+            resources_manager
                 .borrow_framebuffer(&self.point_shadows[i])
                 .unwrap()
-                .handle;
-            unsafe {
-                self.gl.clear_named_framebuffer_f32(fb, gl::DEPTH, 0, 1.0);
-            }
+                .clear_depth(1.0);
 
-            make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+            graphics::submit_draw_call(
+                DrawMode::Triangles,
+                DataType::Uint32,
+                (memory_manager.get_indirect_command_index() - self.pending_indirect_command_count)
+                    * DRAW_COMMAND_SIZE,
+                self.pending_indirect_command_count,
+            );
         }
 
         if renderer_state.spot_lights.len() > 0 || renderer_state.directional_light.is_some() {
@@ -260,15 +255,18 @@ impl<'a> PipelineStage for ShadowStage<'a> {
                 ..Default::default()
             });
 
-            let fb = resources_manager
+            resources_manager
                 .borrow_framebuffer(&self.spot_shadows[i])
                 .unwrap()
-                .handle;
-            unsafe {
-                self.gl.clear_named_framebuffer_f32(fb, gl::DEPTH, 0, 1.0);
-            }
+                .clear_depth(1.0);
 
-            make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+            graphics::submit_draw_call(
+                DrawMode::Triangles,
+                DataType::Uint32,
+                (memory_manager.get_indirect_command_index() - self.pending_indirect_command_count)
+                    * DRAW_COMMAND_SIZE,
+                self.pending_indirect_command_count,
+            );
         }
 
         if let Some(_directional_light) = renderer_state.directional_light {
@@ -280,15 +278,18 @@ impl<'a> PipelineStage for ShadowStage<'a> {
                 ..Default::default()
             });
 
-            let fb = resources_manager
+            resources_manager
                 .borrow_framebuffer(&self.directional_shadow)
                 .unwrap()
-                .handle;
-            unsafe {
-                self.gl.clear_named_framebuffer_f32(fb, gl::DEPTH, 0, 1.0);
-            }
+                .clear_depth(1.0);
 
-            make_draw_call(self.gl, memory_manager, self.pending_indirect_command_count);
+            graphics::submit_draw_call(
+                DrawMode::Triangles,
+                DataType::Uint32,
+                (memory_manager.get_indirect_command_index() - self.pending_indirect_command_count)
+                    * DRAW_COMMAND_SIZE,
+                self.pending_indirect_command_count,
+            );
         }
 
         self.pending_indirect_command_count = 0;
@@ -320,17 +321,4 @@ fn upload_draw_data(
     memory_manager.push_indirect_command(indirect_command);
     memory_manager.push_vertex_slice(&mesh.vertices);
     memory_manager.push_index_slice(&mesh.indices);
-}
-
-fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: u32) {
-    unsafe {
-        gl.multi_draw_elements_indirect_offset(
-            gl::TRIANGLES,
-            gl::UNSIGNED_INT,
-            ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
-                as i32,
-            command_count as i32,
-            0,
-        );
-    }
 }

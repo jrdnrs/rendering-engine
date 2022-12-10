@@ -1,32 +1,32 @@
-use glow::{self as gl, HasContext};
-
 use super::PipelineStage;
 use crate::{
     components::Renderable,
+    graphics::{
+        self,
+        state::{Comparison, Orientation, RasteriserState},
+    },
     memory_manager::memory_manager::{
         DrawElementsIndirectCommand, InstanceData, MemoryManager, DRAW_COMMAND_SIZE,
     },
-    renderer::state::{RasteriserState, RendererState},
+    renderer::state::RendererState,
     resource_manager::resource_manager::{FramebufferID, ResourceIDTrait, ResourcesManager},
 };
 
-pub struct SkyStage<'a> {
-    gl: &'a gl::Context,
+pub struct SkyStage {
     target: FramebufferID,
     skybox: Option<usize>,
 }
 
-impl<'a> SkyStage<'a> {
-    pub fn new(gl: &'a gl::Context, target: FramebufferID) -> Self {
+impl SkyStage {
+    pub fn new(target: FramebufferID) -> Self {
         Self {
-            gl,
             target,
             skybox: None,
         }
     }
 }
 
-impl<'a> PipelineStage for SkyStage<'a> {
+impl PipelineStage for SkyStage {
     fn get_target(&self) -> FramebufferID {
         self.target
     }
@@ -48,14 +48,15 @@ impl<'a> PipelineStage for SkyStage<'a> {
         memory_manager: &mut MemoryManager,
         resources_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
-        renderables: &[Renderable]
+        rasteriser_state: &mut RasteriserState,
+        renderables: &[Renderable],
     ) {
         if let Some(skybox_index) = &self.skybox {
             let skybox = &renderables[*skybox_index];
 
-            renderer_state.set_rasteriser_state(RasteriserState {
-                depth_func: gl::LEQUAL,
-                cull_face: gl::FRONT,
+            rasteriser_state.set(RasteriserState {
+                depth_func: Comparison::EqualOrLess,
+                cull_face: Orientation::Front,
                 ..Default::default()
             });
 
@@ -72,7 +73,13 @@ impl<'a> PipelineStage for SkyStage<'a> {
             memory_manager.push_instance_data(&instance);
 
             upload_draw_data(memory_manager, resources_manager, skybox, 1, base_instance);
-            make_draw_call(self.gl, memory_manager, 1);
+
+            graphics::submit_draw_call(
+                graphics::DrawMode::Triangles,
+                graphics::DataType::Uint32,
+                (memory_manager.get_indirect_command_index() - 1) * DRAW_COMMAND_SIZE,
+                1,
+            )
         }
     }
 }
@@ -98,17 +105,4 @@ fn upload_draw_data(
     memory_manager.push_indirect_command(indirect_command);
     memory_manager.push_vertex_slice(&mesh.vertices);
     memory_manager.push_index_slice(&mesh.indices);
-}
-
-fn make_draw_call(gl: &gl::Context, memory_manager: &mut MemoryManager, command_count: u32) {
-    unsafe {
-        gl.multi_draw_elements_indirect_offset(
-            gl::TRIANGLES,
-            gl::UNSIGNED_INT,
-            ((memory_manager.get_indirect_command_index() - command_count) * DRAW_COMMAND_SIZE)
-                as i32,
-            command_count as i32,
-            0,
-        );
-    }
 }

@@ -1,6 +1,3 @@
-use glow::{self as gl, HasContext};
-use log::error;
-
 use super::{
     camera::Camera,
     pipeline::RendererPipeline,
@@ -12,68 +9,67 @@ use super::{
 };
 use crate::{
     components::Renderable,
+    graphics::{
+        self,
+        framebuffer::{FramebufferAttachmentConfig, FramebufferConfig, InternalFormat},
+        texture::{TextureConfig, TextureType}, state::RasteriserState,
+    },
     math::*,
     memory_manager::{
         memory_manager::MemoryManager,
         uniform_layouts::{self, DirectionalLight, PointLight, SpotLight},
     },
     resource_manager::{
-        framebuffer::{Framebuffer, FramebufferAttachment, FramebufferConfig, TextureType},
         model,
         resource_manager::{
             MaterialID, MeshID, ResourceIDTrait, ResourcesManager, ShaderProgramID, TextureID,
         },
-        texture::TextureConfig,
     },
 };
 
 pub struct Renderer<'a> {
-    pub gl: &'a gl::Context,
-    pub resources_manager: ResourcesManager<'a>,
-    pub memory_manager: MemoryManager<'a>,
-    pub renderer_state: RendererState<'a>,
+    pub renderer_state: RendererState,
+    pub rasteriser_state: RasteriserState,
     pub renderer_pipeline: RendererPipeline<'a>,
+    pub resources_manager: ResourcesManager,
+    pub memory_manager: MemoryManager,
     pub camera: Camera,
 
     renderables: Vec<Renderable>,
 }
 
-impl<'a> Renderer<'a> {
-    pub fn new(gl: &'a gl::Context) -> Self {
+impl Renderer<'_> {
+    pub fn new() -> Self {
         let mut r = Renderer {
-            gl,
-            resources_manager: ResourcesManager::new(gl),
-            memory_manager: MemoryManager::new(gl),
-            renderer_state: RendererState::new(gl),
-            renderer_pipeline: RendererPipeline::new(gl),
+            renderer_state: RendererState::new(),
+            rasteriser_state: RasteriserState::default(),
+            renderer_pipeline: RendererPipeline::new(),
+            resources_manager: ResourcesManager::new(),
+            memory_manager: MemoryManager::new(),
             camera: Camera::new_perspective(70.0, 0.1, 100.0),
-            renderables: Vec::new()
+            renderables: Vec::new(),
         };
         r.init();
         r
     }
 
     fn init(&mut self) {
-        unsafe {
-            self.gl.debug_message_callback(|_, _, _, _, msg: &str| {
-                error!("{}", msg);
-            });
-        }
+        self.rasteriser_state.update_all();
 
         let config = FramebufferConfig {
-            colour: FramebufferAttachment::Texture {
+            colour: FramebufferAttachmentConfig::Texture {
                 target: TextureType::T2D,
-                internal_format: gl::RGBA16F,
+                internal_format: InternalFormat::RGBA16F,
                 layers: 1,
                 levels: 5,
             },
-            depth: FramebufferAttachment::Texture {
+            depth: FramebufferAttachmentConfig::Texture {
                 target: TextureType::T2D,
-                internal_format: gl::DEPTH_COMPONENT32F,
+                internal_format: InternalFormat::Depth32F,
                 layers: 1,
                 levels: 1,
             },
-            stencil: FramebufferAttachment::None,
+            stencil: FramebufferAttachmentConfig::None,
             width: crate::WIDTH,
             height: crate::HEIGHT,
             samples: crate::SAMPLES,
@@ -83,7 +79,6 @@ impl<'a> Renderer<'a> {
 
         self.renderer_pipeline.add_stage(
             ShadowStage::new(
-                self.gl,
                 fb_id,
                 &mut self.memory_manager,
                 &mut self.resources_manager,
@@ -92,19 +87,19 @@ impl<'a> Renderer<'a> {
             STAGE_SHADOW,
         );
         self.renderer_pipeline
-            .add_stage(SceneStage::new(self.gl, fb_id), STAGE_SCENE);
+            .add_stage(SceneStage::new(fb_id), STAGE_SCENE);
         self.renderer_pipeline
-            .add_stage(SkyStage::new(self.gl, fb_id), STAGE_SKY);
+            .add_stage(SkyStage::new(fb_id), STAGE_SKY);
         self.renderer_pipeline.add_stage(
-            BloomStage::new(self.gl, fb_id, &mut self.resources_manager),
+            BloomStage::new(fb_id, &mut self.resources_manager),
             STAGE_BLOOM,
         );
         self.renderer_pipeline.add_stage(
-            DebugStage::new(self.gl, fb_id, &mut self.resources_manager),
+            DebugStage::new(fb_id, &mut self.resources_manager),
             STAGE_DEBUG,
         );
         self.renderer_pipeline.add_stage(
-            PostProcessStage::new(self.gl, fb_id, &mut self.resources_manager),
+            PostProcessStage::new(fb_id, &mut self.resources_manager),
             STAGE_POST_PROCESS,
         );
     }
@@ -122,13 +117,7 @@ impl<'a> Renderer<'a> {
             }
         }
 
-        unsafe {
-            self.gl.viewport(0, 0, width as i32, height as i32);
-        }
-    }
-
-    pub fn set_clear_colour(&self, r: f32, g: f32, b: f32, a: f32) {
-        unsafe { self.gl.clear_color(r, g, b, a) }
+        graphics::set_viewport(0, 0, width, height);
     }
 
     pub fn add_point_light(&mut self, mut light: PointLight) {
@@ -210,6 +199,7 @@ impl<'a> Renderer<'a> {
             &mut self.memory_manager,
             &mut self.resources_manager,
             &mut self.renderer_state,
+            &mut self.rasteriser_state,
             &self.renderables,
         );
         self.memory_manager.set_section_lock();
@@ -221,7 +211,8 @@ impl<'a> Renderer<'a> {
 
     pub fn draw(&mut self, renderable: &Renderable) {
         self.renderables.push(renderable.clone());
-        self.renderer_pipeline.submit(self.renderables.len()-1, renderable.pipeline_stages);
+        self.renderer_pipeline
+            .submit(self.renderables.len() - 1, renderable.pipeline_stages);
     }
 
     pub fn load_shader(&mut self, path: &'static str) -> ShaderProgramID {
@@ -234,74 +225,60 @@ impl<'a> Renderer<'a> {
 
     pub fn load_material(&mut self, material: model::Material) -> MaterialID {
         let id = self.resources_manager.load_material(material);
-        let index = id.index() as usize;
-        let material = &self.resources_manager.material_manager.resources[index];
+        let index = id.index();
+        let material = self.resources_manager.material_manager.resources[index as usize];
 
-        let diff_texture_handle = match material.diffuse_texture_id {
-            Some(id) => unsafe {
-                let handle = self.gl.get_texture_handle(
-                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
-                );
-                self.gl.make_texture_handle_resident(handle);
+        let diff_texture_handle;
+        let spec_texture_handle;
+        let norm_texture_handle;
 
-                handle.0.get()
-            },
-            None => unsafe {
-                self.gl
-                    .get_texture_handle(
-                        self.resources_manager
-                            .borrow_texture(&self.resources_manager.placeholder_diffuse_texture)
-                            .unwrap()
-                            .handle,
-                    )
-                    .0
-                    .get()
-            },
-        };
+        if let Some(texture_id) = material.diffuse_texture_id {
+            let texture = self
+                .resources_manager
+                .borrow_mut_texture(&texture_id)
+                .unwrap();
+            texture.make_texture_resident();
+            diff_texture_handle = texture.shader_texture_handle.unwrap();
+        } else {
+            diff_texture_handle = self
+                .resources_manager
+                .borrow_texture(&self.resources_manager.placeholder_diffuse_texture)
+                .unwrap()
+                .shader_texture_handle
+                .unwrap();
+        }
 
-        let spec_texture_handle = match material.specular_texture_id {
-            Some(id) => unsafe {
-                let handle = self.gl.get_texture_handle(
-                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
-                );
-                self.gl.make_texture_handle_resident(handle);
+        if let Some(texture_id) = material.specular_texture_id {
+            let texture = self
+                .resources_manager
+                .borrow_mut_texture(&texture_id)
+                .unwrap();
+            texture.make_texture_resident();
+            spec_texture_handle = texture.shader_texture_handle.unwrap();
+        } else {
+            spec_texture_handle = self
+                .resources_manager
+                .borrow_texture(&self.resources_manager.placeholder_specular_texture)
+                .unwrap()
+                .shader_texture_handle
+                .unwrap();
+        }
 
-                handle.0.get()
-            },
-            None => unsafe {
-                self.gl
-                    .get_texture_handle(
-                        self.resources_manager
-                            .borrow_texture(&self.resources_manager.placeholder_specular_texture)
-                            .unwrap()
-                            .handle,
-                    )
-                    .0
-                    .get()
-            },
-        };
-
-        let norm_texture_handle = match material.normal_texture_id {
-            Some(id) => unsafe {
-                let handle = self.gl.get_texture_handle(
-                    self.resources_manager.texture_manager.resources[id.index() as usize].handle,
-                );
-                self.gl.make_texture_handle_resident(handle);
-
-                handle.0.get()
-            },
-            None => unsafe {
-                self.gl
-                    .get_texture_handle(
-                        self.resources_manager
-                            .borrow_texture(&self.resources_manager.placeholder_normal_texture)
-                            .unwrap()
-                            .handle,
-                    )
-                    .0
-                    .get()
-            },
-        };
+        if let Some(texture_id) = material.normal_texture_id {
+            let texture = self
+                .resources_manager
+                .borrow_mut_texture(&texture_id)
+                .unwrap();
+            texture.make_texture_resident();
+            norm_texture_handle = texture.shader_texture_handle.unwrap();
+        } else {
+            norm_texture_handle = self
+                .resources_manager
+                .borrow_texture(&self.resources_manager.placeholder_normal_texture)
+                .unwrap()
+                .shader_texture_handle
+                .unwrap();
+        }
 
         let material_uniform = uniform_layouts::Material {
             shininess: material.shininess,

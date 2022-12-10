@@ -107,80 +107,95 @@ pub struct GlUniformLocation(pub native_gl::GLuint);
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct GlTransformFeedback(pub NonZeroU32);
 
+#[inline]
 pub unsafe fn create_framebuffer() -> Result<GlFramebuffer, String> {
     let mut name = 0;
     native_gl::glGenFramebuffers(1, &mut name);
     Ok(GlFramebuffer(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn create_named_framebuffer() -> Result<GlFramebuffer, String> {
     let mut name = 0;
     native_gl::glCreateFramebuffers(1, &mut name);
     Ok(GlFramebuffer(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn is_framebuffer(framebuffer: GlFramebuffer) -> bool {
     native_gl::glIsFramebuffer(framebuffer.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn create_query() -> Result<GlQuery, String> {
     let mut name = 0;
     native_gl::glGenQueries(1, &mut name);
     Ok(GlQuery(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn create_renderbuffer() -> Result<GlRenderbuffer, String> {
     let mut name = 0;
     native_gl::glGenRenderbuffers(1, &mut name);
     Ok(GlRenderbuffer(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn create_named_renderbuffer() -> Result<GlRenderbuffer, String> {
     let mut name = 0;
     native_gl::glCreateRenderbuffers(1, &mut name);
     Ok(GlRenderbuffer(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn is_renderbuffer(renderbuffer: GlRenderbuffer) -> bool {
     native_gl::glIsRenderbuffer(renderbuffer.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn create_sampler() -> Result<GlSampler, String> {
     let mut name = 0;
     native_gl::glGenSamplers(1, &mut name);
     Ok(GlSampler(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn create_shader(shader_type: u32) -> Result<GlShader, String> {
     Ok(GlShader(non_zero_u32_gl_name(native_gl::glCreateShader(
         shader_type as u32,
     ))))
 }
 
+#[inline]
 pub unsafe fn is_shader(shader: GlShader) -> bool {
     native_gl::glIsShader(shader.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn create_texture() -> Result<GlTexture, String> {
     let mut name = 0;
     native_gl::glGenTextures(1, &mut name);
     Ok(GlTexture(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn create_named_texture(target: u32) -> Result<GlTexture, String> {
     let mut name = 0;
     native_gl::glCreateTextures(target, 1, &mut name);
     Ok(GlTexture(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn is_texture(texture: GlTexture) -> bool {
     native_gl::glIsTexture(texture.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn delete_shader(shader: GlShader) {
     native_gl::glDeleteShader(shader.0.get());
 }
 
+#[inline]
 pub unsafe fn shader_source(shader: GlShader, source: &str) {
     native_gl::glShaderSource(
         shader.0.get(),
@@ -190,16 +205,19 @@ pub unsafe fn shader_source(shader: GlShader, source: &str) {
     );
 }
 
+#[inline]
 pub unsafe fn compile_shader(shader: GlShader) {
     native_gl::glCompileShader(shader.0.get());
 }
 
+#[inline]
 pub unsafe fn get_shader_compile_status(shader: GlShader) -> bool {
     let mut status = 0;
     native_gl::glGetShaderiv(shader.0.get(), COMPILE_STATUS, &mut status);
     1 == status
 }
 
+#[inline]
 pub unsafe fn get_shader_info_log(shader: GlShader) -> String {
     let mut length = 0;
     native_gl::glGetShaderiv(shader.0.get(), INFO_LOG_LENGTH, &mut length);
@@ -219,6 +237,7 @@ pub unsafe fn get_shader_info_log(shader: GlShader) -> String {
     }
 }
 
+#[inline]
 pub unsafe fn get_tex_image(target: u32, level: i32, format: u32, ty: u32, pixels: PixelPackData) {
     native_gl::glGetTexImage(
         target,
@@ -232,38 +251,46 @@ pub unsafe fn get_tex_image(target: u32, level: i32, format: u32, ty: u32, pixel
     );
 }
 
+#[inline]
 pub unsafe fn create_program() -> Result<GlProgram, String> {
     Ok(GlProgram(
         non_zero_u32_gl_name(native_gl::glCreateProgram()),
     ))
 }
 
+#[inline]
 pub unsafe fn is_program(program: GlProgram) -> bool {
     native_gl::glIsProgram(program.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn delete_program(program: GlProgram) {
     native_gl::glDeleteProgram(program.0.get());
 }
 
+#[inline]
 pub unsafe fn attach_shader(program: GlProgram, shader: GlShader) {
     native_gl::glAttachShader(program.0.get(), shader.0.get());
 }
 
+#[inline]
 pub unsafe fn detach_shader(program: GlProgram, shader: GlShader) {
     native_gl::glDetachShader(program.0.get(), shader.0.get());
 }
 
+#[inline]
 pub unsafe fn link_program(program: GlProgram) {
     native_gl::glLinkProgram(program.0.get());
 }
 
+#[inline]
 pub unsafe fn get_program_link_status(program: GlProgram) -> bool {
     let mut status = 0;
     native_gl::glGetProgramiv(program.0.get(), LINK_STATUS, &mut status);
     1 == status
 }
 
+#[inline]
 pub unsafe fn get_program_info_log(program: GlProgram) -> String {
     let mut length = 0;
     native_gl::glGetProgramiv(program.0.get(), INFO_LOG_LENGTH, &mut length);
@@ -283,12 +310,14 @@ pub unsafe fn get_program_info_log(program: GlProgram) -> String {
     }
 }
 
+#[inline]
 pub unsafe fn get_active_uniforms(program: GlProgram) -> u32 {
     let mut count = 0;
     native_gl::glGetProgramiv(program.0.get(), ACTIVE_UNIFORMS, &mut count);
     count as u32
 }
 
+#[inline]
 pub unsafe fn get_active_uniform(program: GlProgram, index: u32) -> Option<ActiveUniform> {
     let mut uniform_max_size = 0;
     native_gl::glGetProgramiv(
@@ -316,34 +345,41 @@ pub unsafe fn get_active_uniform(program: GlProgram, index: u32) -> Option<Activ
     Some(ActiveUniform { size, utype, name })
 }
 
+#[inline]
 pub unsafe fn use_program(program: Option<GlProgram>) {
     native_gl::glUseProgram(program.map(|p| p.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn create_buffer() -> Result<GlBuffer, String> {
     let mut buffer = 0;
     native_gl::glGenBuffers(1, &mut buffer);
     Ok(GlBuffer(non_zero_u32_gl_name(buffer)))
 }
 
+#[inline]
 pub unsafe fn create_named_buffer() -> Result<GlBuffer, String> {
     let mut buffer = 0;
     native_gl::glCreateBuffers(1, &mut buffer);
     Ok(GlBuffer(non_zero_u32_gl_name(buffer)))
 }
 
+#[inline]
 pub unsafe fn is_buffer(buffer: GlBuffer) -> bool {
     native_gl::glIsBuffer(buffer.0.get()) != 0
 }
 
+#[inline]
 pub unsafe fn bind_buffer(target: u32, buffer: Option<GlBuffer>) {
     native_gl::glBindBuffer(target, buffer.map(|b| b.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn bind_buffer_base(target: u32, index: u32, buffer: Option<GlBuffer>) {
     native_gl::glBindBufferBase(target, index, buffer.map(|b| b.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn bind_buffer_range(
     target: u32,
     index: u32,
@@ -360,6 +396,7 @@ pub unsafe fn bind_buffer_range(
     );
 }
 
+#[inline]
 pub unsafe fn bind_vertex_buffer(
     binding_index: u32,
     buffer: Option<GlBuffer>,
@@ -374,14 +411,17 @@ pub unsafe fn bind_vertex_buffer(
     );
 }
 
+#[inline]
 pub unsafe fn bind_framebuffer(target: u32, framebuffer: Option<GlFramebuffer>) {
     native_gl::glBindFramebuffer(target, framebuffer.map(|fb| fb.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn bind_renderbuffer(target: u32, renderbuffer: Option<GlRenderbuffer>) {
     native_gl::glBindRenderbuffer(target, renderbuffer.map(|rb| rb.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn blit_framebuffer(
     src_x0: i32,
     src_y0: i32,
@@ -399,6 +439,7 @@ pub unsafe fn blit_framebuffer(
     );
 }
 
+#[inline]
 pub unsafe fn blit_named_framebuffer(
     read_framebuffer: GlFramebuffer,
     draw_framebuffer: GlFramebuffer,
@@ -429,6 +470,7 @@ pub unsafe fn blit_named_framebuffer(
     );
 }
 
+#[inline]
 pub unsafe fn blit_from_default_framebuffer(
     draw_framebuffer: GlFramebuffer,
     src_x0: i32,
@@ -458,6 +500,7 @@ pub unsafe fn blit_from_default_framebuffer(
     );
 }
 
+#[inline]
 pub unsafe fn blit_to_default_framebuffer(
     read_framebuffer: GlFramebuffer,
     src_x0: i32,
@@ -487,62 +530,76 @@ pub unsafe fn blit_to_default_framebuffer(
     );
 }
 
+#[inline]
 pub unsafe fn create_vertex_array() -> Result<GlVertexArray, String> {
     let mut vertex_array = 0;
     native_gl::glGenVertexArrays(1, &mut vertex_array);
     Ok(GlVertexArray(non_zero_u32_gl_name(vertex_array)))
 }
 
+#[inline]
 pub unsafe fn create_named_vertex_array() -> Result<GlVertexArray, String> {
     let mut vertex_array = 0;
     native_gl::glCreateVertexArrays(1, &mut vertex_array);
     Ok(GlVertexArray(non_zero_u32_gl_name(vertex_array)))
 }
 
+#[inline]
 pub unsafe fn delete_vertex_array(vertex_array: GlVertexArray) {
     native_gl::glDeleteVertexArrays(1, &vertex_array.0.get());
 }
 
+#[inline]
 pub unsafe fn bind_vertex_array(vertex_array: Option<GlVertexArray>) {
     native_gl::glBindVertexArray(vertex_array.map(|va| va.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn clear_color(red: f32, green: f32, blue: f32, alpha: f32) {
     native_gl::glClearColor(red, green, blue, alpha);
 }
 
+#[inline]
 pub unsafe fn supports_f64_precision() -> bool {
     true
 }
 
+#[inline]
 pub unsafe fn clear_depth_f64(depth: f64) {
     native_gl::glClearDepth(depth);
 }
 
+#[inline]
 pub unsafe fn clear_depth_f32(depth: f32) {
     native_gl::glClearDepthf(depth);
 }
 
+#[inline]
 pub unsafe fn clear_stencil(stencil: i32) {
     native_gl::glClearStencil(stencil);
 }
 
+#[inline]
 pub unsafe fn clear(mask: u32) {
     native_gl::glClear(mask);
 }
 
+#[inline]
 pub unsafe fn patch_parameter_i32(parameter: u32, value: i32) {
     native_gl::glPatchParameteri(parameter, value);
 }
 
+#[inline]
 pub unsafe fn pixel_store_i32(parameter: u32, value: i32) {
     native_gl::glPixelStorei(parameter, value);
 }
 
+#[inline]
 pub unsafe fn pixel_store_bool(parameter: u32, value: bool) {
     native_gl::glPixelStorei(parameter, value as i32);
 }
 
+#[inline]
 pub unsafe fn bind_frag_data_location(program: GlProgram, color_number: u32, name: &str) {
     native_gl::glBindFragDataLocation(
         program.0.get(),
@@ -551,10 +608,12 @@ pub unsafe fn bind_frag_data_location(program: GlProgram, color_number: u32, nam
     );
 }
 
+#[inline]
 pub unsafe fn buffer_data_size(target: u32, size: i32, usage: u32) {
     native_gl::glBufferData(target, size as isize, std::ptr::null(), usage);
 }
 
+#[inline]
 pub unsafe fn buffer_data_u8_slice(target: u32, data: &[u8], usage: u32) {
     native_gl::glBufferData(
         target,
@@ -564,6 +623,7 @@ pub unsafe fn buffer_data_u8_slice(target: u32, data: &[u8], usage: u32) {
     );
 }
 
+#[inline]
 pub unsafe fn named_buffer_data_u8_slice(buffer: GlBuffer, data: &[u8], usage: u32) {
     native_gl::glNamedBufferData(
         buffer.0.get(),
@@ -573,6 +633,7 @@ pub unsafe fn named_buffer_data_u8_slice(buffer: GlBuffer, data: &[u8], usage: u
     );
 }
 
+#[inline]
 pub unsafe fn buffer_sub_data_u8_slice(target: u32, offset: i32, src_data: &[u8]) {
     native_gl::glBufferSubData(
         target,
@@ -582,6 +643,7 @@ pub unsafe fn buffer_sub_data_u8_slice(target: u32, offset: i32, src_data: &[u8]
     );
 }
 
+#[inline]
 pub unsafe fn get_buffer_sub_data(target: u32, offset: i32, dst_data: &mut [u8]) {
     native_gl::glGetBufferSubData(
         target,
@@ -591,6 +653,7 @@ pub unsafe fn get_buffer_sub_data(target: u32, offset: i32, dst_data: &mut [u8])
     );
 }
 
+#[inline]
 pub unsafe fn buffer_storage(target: u32, size: i32, data: Option<&[u8]>, flags: u32) {
     let size = size as isize;
     let data = data.map(|p| p.as_ptr()).unwrap_or(std::ptr::null()) as *const std::ffi::c_void;
@@ -601,36 +664,44 @@ pub unsafe fn buffer_storage(target: u32, size: i32, data: Option<&[u8]>, flags:
     }
 }
 
+#[inline]
 pub unsafe fn named_buffer_storage(buffer: GlBuffer, size: i32, data: Option<&[u8]>, flags: u32) {
     let size = size as isize;
     let data = data.map(|p| p.as_ptr()).unwrap_or(std::ptr::null()) as *const std::ffi::c_void;
     native_gl::glNamedBufferStorage(buffer.0.get(), size, data, flags);
 }
 
+#[inline]
 pub unsafe fn check_framebuffer_status(target: u32) -> u32 {
     native_gl::glCheckFramebufferStatus(target)
 }
 
+#[inline]
 pub unsafe fn check_named_framebuffer_status(framebuffer: GlFramebuffer, target: u32) -> u32 {
     native_gl::glCheckNamedFramebufferStatus(framebuffer.0.get(), target)
 }
 
+#[inline]
 pub unsafe fn clear_buffer_i32_slice(target: u32, draw_buffer: u32, values: &[i32]) {
     native_gl::glClearBufferiv(target, draw_buffer as i32, values.as_ptr());
 }
 
+#[inline]
 pub unsafe fn clear_buffer_u32_slice(target: u32, draw_buffer: u32, values: &[u32]) {
     native_gl::glClearBufferuiv(target, draw_buffer as i32, values.as_ptr());
 }
 
+#[inline]
 pub unsafe fn clear_buffer_f32_slice(target: u32, draw_buffer: u32, values: &[f32]) {
     native_gl::glClearBufferfv(target, draw_buffer as i32, values.as_ptr());
 }
 
+#[inline]
 pub unsafe fn clear_buffer_depth_stencil(target: u32, draw_buffer: u32, depth: f32, stencil: i32) {
     native_gl::glClearBufferfi(target, draw_buffer as i32, depth, stencil);
 }
 
+#[inline]
 pub unsafe fn clear_named_framebuffer_f32(
     framebuffer: GlFramebuffer,
     buffer: u32,
@@ -645,6 +716,22 @@ pub unsafe fn clear_named_framebuffer_f32(
     );
 }
 
+#[inline]
+pub unsafe fn clear_named_framebuffer_f32_slice(
+    framebuffer: GlFramebuffer,
+    buffer: u32,
+    draw_buffer: i32,
+    values: &[f32],
+) {
+    native_gl::glClearNamedFramebufferfv(
+        framebuffer.0.get(),
+        buffer,
+        draw_buffer,
+        values.as_ptr(),
+    );
+}
+
+#[inline]
 pub unsafe fn clear_named_framebuffer_i32(
     framebuffer: GlFramebuffer,
     buffer: u32,
@@ -659,6 +746,7 @@ pub unsafe fn clear_named_framebuffer_i32(
     );
 }
 
+#[inline]
 pub unsafe fn clear_named_framebuffer_u32(
     framebuffer: GlFramebuffer,
     buffer: u32,
@@ -673,14 +761,17 @@ pub unsafe fn clear_named_framebuffer_u32(
     );
 }
 
+#[inline]
 pub unsafe fn client_wait_sync(fence: GlFence, flags: u32, timeout: i32) -> u32 {
     native_gl::glClientWaitSync(fence.0, flags, timeout as u64)
 }
 
+#[inline]
 pub unsafe fn wait_sync(fence: GlFence, flags: u32, timeout: u64) {
     native_gl::glWaitSync(fence.0, flags, timeout)
 }
 
+#[inline]
 pub unsafe fn copy_buffer_sub_data(
     src_target: u32,
     dst_target: u32,
@@ -697,6 +788,7 @@ pub unsafe fn copy_buffer_sub_data(
     );
 }
 
+#[inline]
 pub unsafe fn copy_image_sub_data(
     src_name: GlTexture,
     src_target: u32,
@@ -733,6 +825,7 @@ pub unsafe fn copy_image_sub_data(
     );
 }
 
+#[inline]
 pub unsafe fn copy_tex_image_2d(
     target: u32,
     level: i32,
@@ -746,6 +839,7 @@ pub unsafe fn copy_tex_image_2d(
     native_gl::glCopyTexImage2D(target, level, internal_format, x, y, width, height, border);
 }
 
+#[inline]
 pub unsafe fn copy_tex_sub_image_2d(
     target: u32,
     level: i32,
@@ -759,6 +853,7 @@ pub unsafe fn copy_tex_sub_image_2d(
     native_gl::glCopyTexSubImage2D(target, level, x_offset, y_offset, x, y, width, height);
 }
 
+#[inline]
 pub unsafe fn copy_tex_sub_image_3d(
     target: u32,
     level: i32,
@@ -775,62 +870,77 @@ pub unsafe fn copy_tex_sub_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn delete_buffer(buffer: GlBuffer) {
     native_gl::glDeleteBuffers(1, &buffer.0.get());
 }
 
+#[inline]
 pub unsafe fn delete_framebuffer(framebuffer: GlFramebuffer) {
     native_gl::glDeleteFramebuffers(1, &framebuffer.0.get());
 }
 
+#[inline]
 pub unsafe fn delete_query(query: GlQuery) {
     native_gl::glDeleteQueries(1, &query.0.get());
 }
 
+#[inline]
 pub unsafe fn delete_renderbuffer(renderbuffer: GlRenderbuffer) {
     native_gl::glDeleteRenderbuffers(1, &renderbuffer.0.get());
 }
 
+#[inline]
 pub unsafe fn delete_sampler(sampler: GlSampler) {
     native_gl::glDeleteSamplers(1, &sampler.0.get());
 }
 
+#[inline]
 pub unsafe fn delete_sync(fence: GlFence) {
     native_gl::glDeleteSync(fence.0);
 }
 
+#[inline]
 pub unsafe fn delete_texture(texture: GlTexture) {
     native_gl::glDeleteTextures(1, &texture.0.get());
 }
 
+#[inline]
 pub unsafe fn disable(parameter: u32) {
     native_gl::glDisable(parameter);
 }
 
+#[inline]
 pub unsafe fn disable_draw_buffer(parameter: u32, draw_buffer: u32) {
     native_gl::glDisablei(parameter, draw_buffer);
 }
 
+#[inline]
 pub unsafe fn disable_vertex_attrib_array(index: u32) {
     native_gl::glDisableVertexAttribArray(index);
 }
 
+#[inline]
 pub unsafe fn dispatch_compute(groups_x: u32, groups_y: u32, groups_z: u32) {
     native_gl::glDispatchCompute(groups_x, groups_y, groups_z);
 }
 
+#[inline]
 pub unsafe fn dispatch_compute_indirect(offset: i32) {
     native_gl::glDispatchComputeIndirect(offset as isize);
 }
 
+#[inline]
 pub unsafe fn draw_arrays(mode: u32, first: i32, count: i32) {
     native_gl::glDrawArrays(mode as u32, first, count);
 }
 
+#[inline]
 pub unsafe fn draw_arrays_instanced(mode: u32, first: i32, count: i32, instance_count: i32) {
     native_gl::glDrawArraysInstanced(mode as u32, first, count, instance_count);
 }
 
+#[inline]
 pub unsafe fn draw_arrays_instanced_base_instance(
     mode: u32,
     first: i32,
@@ -847,18 +957,22 @@ pub unsafe fn draw_arrays_instanced_base_instance(
     );
 }
 
+#[inline]
 pub unsafe fn draw_arrays_indirect_offset(mode: u32, offset: i32) {
     native_gl::glDrawArraysIndirect(mode, offset as *const std::ffi::c_void);
 }
 
+#[inline]
 pub unsafe fn draw_buffer(draw_buffer: u32) {
     native_gl::glDrawBuffer(draw_buffer);
 }
 
+#[inline]
 pub unsafe fn draw_buffers(buffers: &[u32]) {
     native_gl::glDrawBuffers(buffers.len() as i32, buffers.as_ptr());
 }
 
+#[inline]
 pub unsafe fn draw_elements(mode: u32, count: i32, element_type: u32, offset: i32) {
     native_gl::glDrawElements(
         mode as u32,
@@ -868,6 +982,7 @@ pub unsafe fn draw_elements(mode: u32, count: i32, element_type: u32, offset: i3
     );
 }
 
+#[inline]
 pub unsafe fn draw_elements_base_vertex(
     mode: u32,
     count: i32,
@@ -884,6 +999,7 @@ pub unsafe fn draw_elements_base_vertex(
     );
 }
 
+#[inline]
 pub unsafe fn draw_elements_instanced(
     mode: u32,
     count: i32,
@@ -900,6 +1016,7 @@ pub unsafe fn draw_elements_instanced(
     );
 }
 
+#[inline]
 pub unsafe fn draw_elements_instanced_base_vertex(
     mode: u32,
     count: i32,
@@ -918,6 +1035,7 @@ pub unsafe fn draw_elements_instanced_base_vertex(
     );
 }
 
+#[inline]
 pub unsafe fn draw_elements_instanced_base_vertex_base_instance(
     mode: u32,
     count: i32,
@@ -938,10 +1056,12 @@ pub unsafe fn draw_elements_instanced_base_vertex_base_instance(
     );
 }
 
+#[inline]
 pub unsafe fn draw_elements_indirect_offset(mode: u32, element_type: u32, offset: i32) {
     native_gl::glDrawElementsIndirect(mode, element_type, offset as *const std::ffi::c_void);
 }
 
+#[inline]
 pub unsafe fn multi_draw_arrays(mode: u32, first: &[i32], count: &[i32]) {
     native_gl::glMultiDrawArrays(
         mode,
@@ -951,6 +1071,7 @@ pub unsafe fn multi_draw_arrays(mode: u32, first: &[i32], count: &[i32]) {
     );
 }
 
+#[inline]
 pub unsafe fn multi_draw_arrays_indirect_offset(
     mode: u32,
     offset: i32,
@@ -965,6 +1086,7 @@ pub unsafe fn multi_draw_arrays_indirect_offset(
     );
 }
 
+#[inline]
 pub unsafe fn multi_draw_elements(mode: u32, count: &[i32], element_type: u32, offset: &[i32]) {
     native_gl::glMultiDrawElements(
         mode,
@@ -975,6 +1097,7 @@ pub unsafe fn multi_draw_elements(mode: u32, count: &[i32], element_type: u32, o
     );
 }
 
+#[inline]
 pub unsafe fn multi_draw_elements_base_vertex(
     mode: u32,
     count: &[i32],
@@ -992,6 +1115,7 @@ pub unsafe fn multi_draw_elements_base_vertex(
     );
 }
 
+#[inline]
 pub unsafe fn multi_draw_elements_indirect_offset(
     mode: u32,
     element_type: u32,
@@ -1008,30 +1132,37 @@ pub unsafe fn multi_draw_elements_indirect_offset(
     );
 }
 
+#[inline]
 pub unsafe fn enable(parameter: u32) {
     native_gl::glEnable(parameter);
 }
 
+#[inline]
 pub unsafe fn is_enabled(parameter: u32) -> bool {
     native_gl::glIsEnabled(parameter) != 0
 }
 
+#[inline]
 pub unsafe fn enable_draw_buffer(parameter: u32, draw_buffer: u32) {
     native_gl::glEnablei(parameter, draw_buffer);
 }
 
+#[inline]
 pub unsafe fn enable_vertex_array_attrib(vao: GlVertexArray, index: u32) {
     native_gl::glEnableVertexArrayAttrib(vao.0.get(), index);
 }
 
+#[inline]
 pub unsafe fn enable_vertex_attrib_array(index: u32) {
     native_gl::glEnableVertexAttribArray(index);
 }
 
+#[inline]
 pub unsafe fn flush() {
     native_gl::glFlush();
 }
 
+#[inline]
 pub unsafe fn framebuffer_renderbuffer(
     target: u32,
     attachment: u32,
@@ -1046,6 +1177,7 @@ pub unsafe fn framebuffer_renderbuffer(
     );
 }
 
+#[inline]
 pub unsafe fn framebuffer_texture(
     target: u32,
     attachment: u32,
@@ -1060,6 +1192,7 @@ pub unsafe fn framebuffer_texture(
     );
 }
 
+#[inline]
 pub unsafe fn framebuffer_texture_2d(
     target: u32,
     attachment: u32,
@@ -1076,6 +1209,7 @@ pub unsafe fn framebuffer_texture_2d(
     );
 }
 
+#[inline]
 pub unsafe fn framebuffer_texture_3d(
     target: u32,
     attachment: u32,
@@ -1094,6 +1228,7 @@ pub unsafe fn framebuffer_texture_3d(
     );
 }
 
+#[inline]
 pub unsafe fn framebuffer_texture_layer(
     target: u32,
     attachment: u32,
@@ -1110,14 +1245,17 @@ pub unsafe fn framebuffer_texture_layer(
     );
 }
 
+#[inline]
 pub unsafe fn named_framebuffer_draw_buffer(framebuffer: GlFramebuffer, color_buffer: u32) {
     native_gl::glNamedFramebufferDrawBuffer(framebuffer.0.get(), color_buffer)
 }
 
+#[inline]
 pub unsafe fn named_framebuffer_read_buffer(framebuffer: GlFramebuffer, source: u32) {
     native_gl::glNamedFramebufferReadBuffer(framebuffer.0.get(), source)
 }
 
+#[inline]
 pub unsafe fn named_framebuffer_parameter_i32(
     framebuffer: GlFramebuffer,
     parameter_name: u32,
@@ -1126,6 +1264,7 @@ pub unsafe fn named_framebuffer_parameter_i32(
     native_gl::glNamedFramebufferParameteri(framebuffer.0.get(), parameter_name, value)
 }
 
+#[inline]
 pub unsafe fn named_framebuffer_renderbuffer(
     framebuffer: GlFramebuffer,
     attachment: u32,
@@ -1140,6 +1279,7 @@ pub unsafe fn named_framebuffer_renderbuffer(
     )
 }
 
+#[inline]
 pub unsafe fn named_framebuffer_texture(
     framebuffer: GlFramebuffer,
     attachment: u32,
@@ -1149,6 +1289,7 @@ pub unsafe fn named_framebuffer_texture(
     native_gl::glNamedFramebufferTexture(framebuffer.0.get(), attachment, texture.0.get(), level)
 }
 
+#[inline]
 pub unsafe fn named_renderbuffer_storage(
     renderbuffer: self::GlRenderbuffer,
     internal_format: u32,
@@ -1158,6 +1299,7 @@ pub unsafe fn named_renderbuffer_storage(
     native_gl::glNamedRenderbufferStorage(renderbuffer.0.get(), internal_format, width, height)
 }
 
+#[inline]
 pub unsafe fn named_renderbuffer_storage_multisample(
     renderbuffer: self::GlRenderbuffer,
     samples: i32,
@@ -1174,72 +1316,86 @@ pub unsafe fn named_renderbuffer_storage_multisample(
     )
 }
 
+#[inline]
 pub unsafe fn front_face(value: u32) {
     native_gl::glFrontFace(value as u32);
 }
 
+#[inline]
 pub unsafe fn get_error() -> u32 {
     native_gl::glGetError()
 }
 
+#[inline]
 pub unsafe fn get_tex_parameter_i32(target: u32, parameter: u32) -> i32 {
     let mut value = 0;
     native_gl::glGetTexParameteriv(target, parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_texture_handle(texture: GlTexture) -> GlTextureHandle {
     GlTextureHandle(non_zero_u64_gl_name(native_gl::glGetTextureHandleARB(
         texture.0.get(),
     )))
 }
 
+#[inline]
 pub unsafe fn make_texture_handle_non_resident(texture_handle: GlTextureHandle) {
     native_gl::glMakeTextureHandleNonResidentARB(texture_handle.0.get())
 }
 
+#[inline]
 pub unsafe fn make_texture_handle_resident(texture_handle: GlTextureHandle) {
     native_gl::glMakeTextureHandleResidentARB(texture_handle.0.get())
 }
 
+#[inline]
 pub unsafe fn get_buffer_parameter_i32(target: u32, parameter: u32) -> i32 {
     let mut value = 0;
     native_gl::glGetBufferParameteriv(target, parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_parameter_i32(parameter: u32) -> i32 {
     let mut value = 0;
     native_gl::glGetIntegerv(parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_parameter_i64(parameter: u32) -> i64 {
     let mut value = 0;
     native_gl::glGetInteger64v(parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_parameter_i32_slice(parameter: u32, out: &mut [i32]) {
     native_gl::glGetIntegerv(parameter, &mut out[0]);
 }
 
+#[inline]
 pub unsafe fn get_parameter_f32(parameter: u32) -> f32 {
     let mut value: f32 = 0.0;
     native_gl::glGetFloatv(parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_parameter_f32_slice(parameter: u32, out: &mut [f32]) {
     native_gl::glGetFloatv(parameter, &mut out[0]);
 }
 
+#[inline]
 pub unsafe fn get_parameter_indexed_i32(parameter: u32, index: u32) -> i32 {
     let mut value = 0;
     native_gl::glGetIntegeri_v(parameter, index, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn get_parameter_indexed_string(parameter: u32, index: u32) -> String {
     let raw_ptr = native_gl::glGetStringi(parameter, index);
     std::ffi::CStr::from_ptr(raw_ptr as *const native_gl::GLchar)
@@ -1248,6 +1404,7 @@ pub unsafe fn get_parameter_indexed_string(parameter: u32, index: u32) -> String
         .to_owned()
 }
 
+#[inline]
 pub unsafe fn get_parameter_string(parameter: u32) -> String {
     let raw_ptr = native_gl::glGetString(parameter);
     std::ffi::CStr::from_ptr(raw_ptr as *const native_gl::GLchar)
@@ -1256,6 +1413,7 @@ pub unsafe fn get_parameter_string(parameter: u32) -> String {
         .to_owned()
 }
 
+#[inline]
 pub unsafe fn get_uniform_location(program: GlProgram, name: &str) -> Option<GlUniformLocation> {
     let name = CString::new(name).unwrap();
     let uniform_location =
@@ -1267,6 +1425,7 @@ pub unsafe fn get_uniform_location(program: GlProgram, name: &str) -> Option<GlU
     }
 }
 
+#[inline]
 pub unsafe fn get_attrib_location(program: GlProgram, name: &str) -> Option<u32> {
     let name = CString::new(name).unwrap();
     let attrib_location =
@@ -1278,6 +1437,7 @@ pub unsafe fn get_attrib_location(program: GlProgram, name: &str) -> Option<u32>
     }
 }
 
+#[inline]
 pub unsafe fn bind_attrib_location(program: GlProgram, index: u32, name: &str) {
     let name = CString::new(name).unwrap();
     native_gl::glBindAttribLocation(
@@ -1287,12 +1447,14 @@ pub unsafe fn bind_attrib_location(program: GlProgram, index: u32, name: &str) {
     );
 }
 
+#[inline]
 pub unsafe fn get_active_attributes(program: GlProgram) -> u32 {
     let mut count = 0;
     native_gl::glGetProgramiv(program.0.get(), ACTIVE_ATTRIBUTES, &mut count);
     count as u32
 }
 
+#[inline]
 pub unsafe fn get_active_attribute(program: GlProgram, index: u32) -> Option<ActiveAttribute> {
     let mut attribute_max_size = 0;
     native_gl::glGetProgramiv(
@@ -1320,6 +1482,7 @@ pub unsafe fn get_active_attribute(program: GlProgram, index: u32) -> Option<Act
     Some(ActiveAttribute { name, size, atype })
 }
 
+#[inline]
 pub unsafe fn get_sync_status(fence: GlFence) -> u32 {
     let mut len = 0;
     let mut values = [UNSIGNALED as i32];
@@ -1333,14 +1496,17 @@ pub unsafe fn get_sync_status(fence: GlFence) -> u32 {
     values[0] as u32
 }
 
+#[inline]
 pub unsafe fn is_sync(fence: GlFence) -> bool {
     1 == native_gl::glIsSync(fence.0)
 }
 
+#[inline]
 pub unsafe fn renderbuffer_storage(target: u32, internal_format: u32, width: i32, height: i32) {
     native_gl::glRenderbufferStorage(target, internal_format, width, height);
 }
 
+#[inline]
 pub unsafe fn renderbuffer_storage_multisample(
     target: u32,
     samples: i32,
@@ -1351,26 +1517,32 @@ pub unsafe fn renderbuffer_storage_multisample(
     native_gl::glRenderbufferStorageMultisample(target, samples, internal_format, width, height);
 }
 
+#[inline]
 pub unsafe fn sampler_parameter_f32(sampler: GlSampler, name: u32, value: f32) {
     native_gl::glSamplerParameterf(sampler.0.get(), name, value);
 }
 
+#[inline]
 pub unsafe fn sampler_parameter_f32_slice(sampler: GlSampler, name: u32, value: &[f32]) {
     native_gl::glSamplerParameterfv(sampler.0.get(), name, value.as_ptr());
 }
 
+#[inline]
 pub unsafe fn sampler_parameter_i32(sampler: GlSampler, name: u32, value: i32) {
     native_gl::glSamplerParameteri(sampler.0.get(), name, value);
 }
 
+#[inline]
 pub unsafe fn generate_mipmap(target: u32) {
     native_gl::glGenerateMipmap(target);
 }
 
+#[inline]
 pub unsafe fn generate_texture_mipmap(texture: GlTexture) {
     native_gl::glGenerateTextureMipmap(texture.0.get());
 }
 
+#[inline]
 pub unsafe fn tex_image_1d(
     target: u32,
     level: i32,
@@ -1393,6 +1565,7 @@ pub unsafe fn tex_image_1d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_tex_image_1d(
     target: u32,
     level: i32,
@@ -1413,6 +1586,7 @@ pub unsafe fn compressed_tex_image_1d(
     );
 }
 
+#[inline]
 pub unsafe fn tex_image_2d(
     target: u32,
     level: i32,
@@ -1437,6 +1611,7 @@ pub unsafe fn tex_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn tex_image_2d_multisample(
     target: u32,
     samples: i32,
@@ -1455,6 +1630,7 @@ pub unsafe fn tex_image_2d_multisample(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_tex_image_2d(
     target: u32,
     level: i32,
@@ -1477,6 +1653,7 @@ pub unsafe fn compressed_tex_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn tex_image_3d(
     target: u32,
     level: i32,
@@ -1503,6 +1680,7 @@ pub unsafe fn tex_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_tex_image_3d(
     target: u32,
     level: i32,
@@ -1527,10 +1705,12 @@ pub unsafe fn compressed_tex_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn tex_storage_1d(target: u32, levels: i32, internal_format: u32, width: i32) {
     native_gl::glTexStorage1D(target, levels, internal_format, width);
 }
 
+#[inline]
 pub unsafe fn tex_storage_2d(
     target: u32,
     levels: i32,
@@ -1541,6 +1721,7 @@ pub unsafe fn tex_storage_2d(
     native_gl::glTexStorage2D(target, levels, internal_format, width, height);
 }
 
+#[inline]
 pub unsafe fn texture_storage_2d(
     texture: GlTexture,
     levels: i32,
@@ -1551,6 +1732,7 @@ pub unsafe fn texture_storage_2d(
     native_gl::glTextureStorage2D(texture.0.get(), levels, internal_format, width, height);
 }
 
+#[inline]
 pub unsafe fn tex_storage_2d_multisample(
     target: u32,
     samples: i32,
@@ -1569,6 +1751,7 @@ pub unsafe fn tex_storage_2d_multisample(
     );
 }
 
+#[inline]
 pub unsafe fn texture_storage_2d_multisample(
     texture: GlTexture,
     samples: i32,
@@ -1587,6 +1770,7 @@ pub unsafe fn texture_storage_2d_multisample(
     );
 }
 
+#[inline]
 pub unsafe fn tex_storage_3d(
     target: u32,
     levels: i32,
@@ -1598,6 +1782,7 @@ pub unsafe fn tex_storage_3d(
     native_gl::glTexStorage3D(target, levels, internal_format, width, height, depth);
 }
 
+#[inline]
 pub unsafe fn texture_storage_3d(
     texture: GlTexture,
     levels: i32,
@@ -1616,6 +1801,7 @@ pub unsafe fn texture_storage_3d(
     );
 }
 
+#[inline]
 pub unsafe fn get_uniform_i32(program: GlProgram, location: &GlUniformLocation, v: &mut [i32]) {
     native_gl::glGetUniformiv(
         program.0.get() as u32,
@@ -1624,6 +1810,7 @@ pub unsafe fn get_uniform_i32(program: GlProgram, location: &GlUniformLocation, 
     )
 }
 
+#[inline]
 pub unsafe fn get_uniform_f32(program: GlProgram, location: &GlUniformLocation, v: &mut [f32]) {
     native_gl::glGetUniformfv(
         program.0.get() as u32,
@@ -1632,150 +1819,175 @@ pub unsafe fn get_uniform_f32(program: GlProgram, location: &GlUniformLocation, 
     )
 }
 
+#[inline]
 pub unsafe fn uniform_1_i32(location: Option<&GlUniformLocation>, x: i32) {
     if let Some(loc) = location {
         native_gl::glUniform1i(loc.0 as i32, x);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_i32(location: Option<&GlUniformLocation>, x: i32, y: i32) {
     if let Some(loc) = location {
         native_gl::glUniform2i(loc.0 as i32, x, y);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_i32(location: Option<&GlUniformLocation>, x: i32, y: i32, z: i32) {
     if let Some(loc) = location {
         native_gl::glUniform3i(loc.0 as i32, x, y, z);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_i32(location: Option<&GlUniformLocation>, x: i32, y: i32, z: i32, w: i32) {
     if let Some(loc) = location {
         native_gl::glUniform4i(loc.0 as i32, x, y, z, w);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_1_i32_slice(location: Option<&GlUniformLocation>, v: &[i32]) {
     if let Some(loc) = location {
         native_gl::glUniform1iv(loc.0 as i32, v.len() as i32, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_i32_slice(location: Option<&GlUniformLocation>, v: &[i32]) {
     if let Some(loc) = location {
         native_gl::glUniform2iv(loc.0 as i32, v.len() as i32 / 2, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_i32_slice(location: Option<&GlUniformLocation>, v: &[i32]) {
     if let Some(loc) = location {
         native_gl::glUniform3iv(loc.0 as i32, v.len() as i32 / 3, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_i32_slice(location: Option<&GlUniformLocation>, v: &[i32]) {
     if let Some(loc) = location {
         native_gl::glUniform4iv(loc.0 as i32, v.len() as i32 / 4, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_1_u32(location: Option<&GlUniformLocation>, x: u32) {
     if let Some(loc) = location {
         native_gl::glUniform1ui(loc.0 as i32, x);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_u32(location: Option<&GlUniformLocation>, x: u32, y: u32) {
     if let Some(loc) = location {
         native_gl::glUniform2ui(loc.0 as i32, x, y);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_u32(location: Option<&GlUniformLocation>, x: u32, y: u32, z: u32) {
     if let Some(loc) = location {
         native_gl::glUniform3ui(loc.0 as i32, x, y, z);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_u32(location: Option<&GlUniformLocation>, x: u32, y: u32, z: u32, w: u32) {
     if let Some(loc) = location {
         native_gl::glUniform4ui(loc.0 as i32, x, y, z, w);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_1_u32_slice(location: Option<&GlUniformLocation>, v: &[u32]) {
     if let Some(loc) = location {
         native_gl::glUniform1uiv(loc.0 as i32, v.len() as i32, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_u32_slice(location: Option<&GlUniformLocation>, v: &[u32]) {
     if let Some(loc) = location {
         native_gl::glUniform2uiv(loc.0 as i32, v.len() as i32 / 2, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_u32_slice(location: Option<&GlUniformLocation>, v: &[u32]) {
     if let Some(loc) = location {
         native_gl::glUniform3uiv(loc.0 as i32, v.len() as i32 / 3, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_u32_slice(location: Option<&GlUniformLocation>, v: &[u32]) {
     if let Some(loc) = location {
         native_gl::glUniform4uiv(loc.0 as i32, v.len() as i32 / 4, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_1_f32(location: Option<&GlUniformLocation>, x: f32) {
     if let Some(loc) = location {
         native_gl::glUniform1f(loc.0 as i32, x);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_f32(location: Option<&GlUniformLocation>, x: f32, y: f32) {
     if let Some(loc) = location {
         native_gl::glUniform2f(loc.0 as i32, x, y);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_f32(location: Option<&GlUniformLocation>, x: f32, y: f32, z: f32) {
     if let Some(loc) = location {
         native_gl::glUniform3f(loc.0 as i32, x, y, z);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_f32(location: Option<&GlUniformLocation>, x: f32, y: f32, z: f32, w: f32) {
     if let Some(loc) = location {
         native_gl::glUniform4f(loc.0 as i32, x, y, z, w);
     }
 }
 
+#[inline]
 pub unsafe fn uniform_1_f32_slice(location: Option<&GlUniformLocation>, v: &[f32]) {
     if let Some(loc) = location {
         native_gl::glUniform1fv(loc.0 as i32, v.len() as i32, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_2_f32_slice(location: Option<&GlUniformLocation>, v: &[f32]) {
     if let Some(loc) = location {
         native_gl::glUniform2fv(loc.0 as i32, v.len() as i32 / 2, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_3_f32_slice(location: Option<&GlUniformLocation>, v: &[f32]) {
     if let Some(loc) = location {
         native_gl::glUniform3fv(loc.0 as i32, v.len() as i32 / 3, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_4_f32_slice(location: Option<&GlUniformLocation>, v: &[f32]) {
     if let Some(loc) = location {
         native_gl::glUniform4fv(loc.0 as i32, v.len() as i32 / 4, v.as_ptr());
     }
 }
 
+#[inline]
 pub unsafe fn uniform_matrix_2_f32_slice(
     location: Option<&GlUniformLocation>,
     transpose: bool,
@@ -1791,6 +2003,7 @@ pub unsafe fn uniform_matrix_2_f32_slice(
     }
 }
 
+#[inline]
 pub unsafe fn uniform_matrix_3_f32_slice(
     location: Option<&GlUniformLocation>,
     transpose: bool,
@@ -1806,6 +2019,7 @@ pub unsafe fn uniform_matrix_3_f32_slice(
     }
 }
 
+#[inline]
 pub unsafe fn uniform_matrix_4_f32_slice(
     location: Option<&GlUniformLocation>,
     transpose: bool,
@@ -1821,22 +2035,27 @@ pub unsafe fn uniform_matrix_4_f32_slice(
     }
 }
 
+#[inline]
 pub unsafe fn unmap_buffer(target: u32) {
     native_gl::glUnmapBuffer(target);
 }
 
+#[inline]
 pub unsafe fn unmap_named_buffer(buffer: GlBuffer) {
     native_gl::glUnmapNamedBuffer(buffer.0.get());
 }
 
+#[inline]
 pub unsafe fn cull_face(value: u32) {
     native_gl::glCullFace(value as u32);
 }
 
+#[inline]
 pub unsafe fn color_mask(red: bool, green: bool, blue: bool, alpha: bool) {
     native_gl::glColorMask(red as u8, green as u8, blue as u8, alpha as u8);
 }
 
+#[inline]
 pub unsafe fn color_mask_draw_buffer(
     draw_buffer: u32,
     red: bool,
@@ -1847,22 +2066,27 @@ pub unsafe fn color_mask_draw_buffer(
     native_gl::glColorMaski(draw_buffer, red as u8, green as u8, blue as u8, alpha as u8);
 }
 
+#[inline]
 pub unsafe fn depth_mask(value: bool) {
     native_gl::glDepthMask(value as u8);
 }
 
+#[inline]
 pub unsafe fn blend_color(red: f32, green: f32, blue: f32, alpha: f32) {
     native_gl::glBlendColor(red, green, blue, alpha);
 }
 
+#[inline]
 pub unsafe fn line_width(width: f32) {
     native_gl::glLineWidth(width);
 }
 
+#[inline]
 pub unsafe fn map_buffer_range(target: u32, offset: i32, length: i32, access: u32) -> *mut u8 {
     native_gl::glMapBufferRange(target, offset as isize, length as isize, access) as *mut u8
 }
 
+#[inline]
 pub unsafe fn map_named_buffer_range(
     buffer: GlBuffer,
     offset: i32,
@@ -1873,66 +2097,82 @@ pub unsafe fn map_named_buffer_range(
         as *mut u8
 }
 
+#[inline]
 pub unsafe fn flush_mapped_buffer_range(target: u32, offset: i32, length: i32) {
     native_gl::glFlushMappedBufferRange(target, offset as isize, length as isize)
 }
 
+#[inline]
 pub unsafe fn invalidate_buffer_sub_data(target: u32, offset: i32, length: i32) {
     native_gl::glInvalidateBufferSubData(target, offset as isize, length as isize)
 }
 
+#[inline]
 pub unsafe fn invalidate_framebuffer(target: u32, attachments: &[u32]) {
     native_gl::glInvalidateFramebuffer(target, attachments.len() as i32, attachments.as_ptr());
 }
 
+#[inline]
 pub unsafe fn polygon_offset(factor: f32, units: f32) {
     native_gl::glPolygonOffset(factor, units);
 }
 
+#[inline]
 pub unsafe fn polygon_mode(face: u32, mode: u32) {
     native_gl::glPolygonMode(face as u32, mode as u32);
 }
 
+#[inline]
 pub unsafe fn finish() {
     native_gl::glFinish();
 }
 
+#[inline]
 pub unsafe fn bind_texture(target: u32, texture: Option<GlTexture>) {
     native_gl::glBindTexture(target, texture.map(|t| t.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn bind_sampler(unit: u32, sampler: Option<GlSampler>) {
     native_gl::glBindSampler(unit, sampler.map(|s| s.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn active_texture(unit: u32) {
     native_gl::glActiveTexture(unit);
 }
 
+#[inline]
 pub unsafe fn fence_sync(condition: u32, flags: u32) -> Result<GlFence, String> {
     Ok(GlFence(native_gl::glFenceSync(condition as u32, flags)))
 }
 
+#[inline]
 pub unsafe fn tex_parameter_f32(target: u32, parameter: u32, value: f32) {
     native_gl::glTexParameterf(target, parameter, value);
 }
 
+#[inline]
 pub unsafe fn tex_parameter_i32(target: u32, parameter: u32, value: i32) {
     native_gl::glTexParameteri(target, parameter, value);
 }
 
+#[inline]
 pub unsafe fn texture_parameter_i32(texture: GlTexture, parameter: u32, value: i32) {
     native_gl::glTextureParameteri(texture.0.get(), parameter, value);
 }
 
+#[inline]
 pub unsafe fn tex_parameter_f32_slice(target: u32, parameter: u32, values: &[f32]) {
     native_gl::glTexParameterfv(target, parameter, values.as_ptr());
 }
 
+#[inline]
 pub unsafe fn tex_parameter_i32_slice(target: u32, parameter: u32, values: &[i32]) {
     native_gl::glTexParameteriv(target, parameter, values.as_ptr());
 }
 
+#[inline]
 pub unsafe fn tex_sub_image_2d(
     target: u32,
     level: i32,
@@ -1960,6 +2200,7 @@ pub unsafe fn tex_sub_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn texture_sub_image_2d(
     texture: GlTexture,
     level: i32,
@@ -1987,6 +2228,7 @@ pub unsafe fn texture_sub_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_tex_sub_image_2d(
     target: u32,
     level: i32,
@@ -2012,6 +2254,7 @@ pub unsafe fn compressed_tex_sub_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_texture_sub_image_2d(
     texture: GlTexture,
     level: i32,
@@ -2045,6 +2288,7 @@ pub unsafe fn compressed_texture_sub_image_2d(
     );
 }
 
+#[inline]
 pub unsafe fn tex_sub_image_3d(
     target: u32,
     level: i32,
@@ -2076,6 +2320,7 @@ pub unsafe fn tex_sub_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn texture_sub_image_3d(
     texture: GlTexture,
     level: i32,
@@ -2107,6 +2352,7 @@ pub unsafe fn texture_sub_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_tex_sub_image_3d(
     target: u32,
     level: i32,
@@ -2134,6 +2380,7 @@ pub unsafe fn compressed_tex_sub_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn compressed_texture_sub_image_3d(
     texture: GlTexture,
     level: i32,
@@ -2171,34 +2418,42 @@ pub unsafe fn compressed_texture_sub_image_3d(
     );
 }
 
+#[inline]
 pub unsafe fn depth_func(func: u32) {
     native_gl::glDepthFunc(func as u32);
 }
 
+#[inline]
 pub unsafe fn depth_range_f32(near: f32, far: f32) {
     native_gl::glDepthRangef(near, far);
 }
 
+#[inline]
 pub unsafe fn depth_range_f64(near: f64, far: f64) {
     native_gl::glDepthRange(near, far);
 }
 
+#[inline]
 pub unsafe fn depth_range_f64_slice(first: u32, count: i32, values: &[[f64; 2]]) {
     native_gl::glDepthRangeArrayv(first, count, values.as_ptr() as *const f64);
 }
 
+#[inline]
 pub unsafe fn scissor(x: i32, y: i32, width: i32, height: i32) {
     native_gl::glScissor(x, y, width, height);
 }
 
+#[inline]
 pub unsafe fn scissor_slice(first: u32, count: i32, scissors: &[[i32; 4]]) {
     native_gl::glScissorArrayv(first, count, scissors.as_ptr() as *const i32);
 }
 
+#[inline]
 pub unsafe fn vertex_array_attrib_binding_f32(vao: GlVertexArray, index: u32, binding_index: u32) {
     native_gl::glVertexArrayAttribBinding(vao.0.get(), index, binding_index);
 }
 
+#[inline]
 pub unsafe fn vertex_array_attrib_format_f32(
     vao: GlVertexArray,
     index: u32,
@@ -2217,6 +2472,7 @@ pub unsafe fn vertex_array_attrib_format_f32(
     );
 }
 
+#[inline]
 pub unsafe fn vertex_array_attrib_format_i32(
     vao: GlVertexArray,
     index: u32,
@@ -2227,10 +2483,12 @@ pub unsafe fn vertex_array_attrib_format_i32(
     native_gl::glVertexArrayAttribIFormat(vao.0.get(), index, size, data_type, relative_offset);
 }
 
+#[inline]
 pub unsafe fn vertex_array_element_buffer(vao: GlVertexArray, buffer: Option<GlBuffer>) {
     native_gl::glVertexArrayElementBuffer(vao.0.get(), buffer.map(|b| b.0.get()).unwrap_or(0));
 }
 
+#[inline]
 pub unsafe fn vertex_array_vertex_buffer(
     vao: GlVertexArray,
     binding_index: u32,
@@ -2247,14 +2505,17 @@ pub unsafe fn vertex_array_vertex_buffer(
     );
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_divisor(index: u32, divisor: u32) {
     native_gl::glVertexAttribDivisor(index, divisor);
 }
 
+#[inline]
 pub unsafe fn vertex_array_binding_divisor(vao: GlVertexArray, binding_index: u32, divisor: u32) {
     native_gl::glVertexArrayBindingDivisor(vao.0.get(), binding_index, divisor)
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_pointer_f32(
     index: u32,
     size: i32,
@@ -2273,6 +2534,7 @@ pub unsafe fn vertex_attrib_pointer_f32(
     );
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_pointer_i32(
     index: u32,
     size: i32,
@@ -2289,6 +2551,7 @@ pub unsafe fn vertex_attrib_pointer_i32(
     );
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_pointer_f64(
     index: u32,
     size: i32,
@@ -2305,6 +2568,7 @@ pub unsafe fn vertex_attrib_pointer_f64(
     );
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_format_f32(
     index: u32,
     size: i32,
@@ -2315,6 +2579,7 @@ pub unsafe fn vertex_attrib_format_f32(
     native_gl::glVertexAttribFormat(index, size, data_type, normalized as u8, relative_offset);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_format_i32(
     index: u32,
     size: i32,
@@ -2324,66 +2589,82 @@ pub unsafe fn vertex_attrib_format_i32(
     native_gl::glVertexAttribIFormat(index, size, data_type, relative_offset);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_1_f32(index: u32, x: f32) {
     native_gl::glVertexAttrib1f(index, x);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_2_f32(index: u32, x: f32, y: f32) {
     native_gl::glVertexAttrib2f(index, x, y);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_3_f32(index: u32, x: f32, y: f32, z: f32) {
     native_gl::glVertexAttrib3f(index, x, y, z);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_4_f32(index: u32, x: f32, y: f32, z: f32, w: f32) {
     native_gl::glVertexAttrib4f(index, x, y, z, w);
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_1_f32_slice(index: u32, v: &[f32]) {
     native_gl::glVertexAttrib1fv(index, v.as_ptr());
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_2_f32_slice(index: u32, v: &[f32]) {
     native_gl::glVertexAttrib2fv(index, v.as_ptr());
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_3_f32_slice(index: u32, v: &[f32]) {
     native_gl::glVertexAttrib3fv(index, v.as_ptr());
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_4_f32_slice(index: u32, v: &[f32]) {
     native_gl::glVertexAttrib4fv(index, v.as_ptr());
 }
 
+#[inline]
 pub unsafe fn vertex_attrib_binding(attrib_index: u32, binding_index: u32) {
     native_gl::glVertexAttribBinding(attrib_index, binding_index);
 }
 
+#[inline]
 pub unsafe fn vertex_binding_divisor(binding_index: u32, divisor: u32) {
     native_gl::glVertexBindingDivisor(binding_index, divisor);
 }
 
+#[inline]
 pub unsafe fn viewport(x: i32, y: i32, width: i32, height: i32) {
     native_gl::glViewport(x, y, width, height);
 }
 
+#[inline]
 pub unsafe fn viewport_f32_slice(first: u32, count: i32, values: &[[f32; 4]]) {
     native_gl::glViewportArrayv(first, count, values.as_ptr() as *const f32);
 }
 
+#[inline]
 pub unsafe fn blend_equation(mode: u32) {
     native_gl::glBlendEquation(mode as u32);
 }
 
+#[inline]
 pub unsafe fn blend_equation_draw_buffer(draw_buffer: u32, mode: u32) {
     native_gl::glBlendEquationi(draw_buffer, mode as u32);
 }
 
+#[inline]
 pub unsafe fn blend_equation_separate(mode_rgb: u32, mode_alpha: u32) {
     native_gl::glBlendEquationSeparate(mode_rgb as u32, mode_alpha as u32);
 }
 
+#[inline]
 pub unsafe fn blend_equation_separate_draw_buffer(
     draw_buffer: u32,
     mode_rgb: u32,
@@ -2392,14 +2673,17 @@ pub unsafe fn blend_equation_separate_draw_buffer(
     native_gl::glBlendEquationSeparatei(draw_buffer, mode_rgb as u32, mode_alpha as u32);
 }
 
+#[inline]
 pub unsafe fn blend_func(src: u32, dst: u32) {
     native_gl::glBlendFunc(src as u32, dst as u32);
 }
 
+#[inline]
 pub unsafe fn blend_func_draw_buffer(draw_buffer: u32, src: u32, dst: u32) {
     native_gl::glBlendFunci(draw_buffer, src as u32, dst as u32);
 }
 
+#[inline]
 pub unsafe fn blend_func_separate(src_rgb: u32, dst_rgb: u32, src_alpha: u32, dst_alpha: u32) {
     native_gl::glBlendFuncSeparate(
         src_rgb as u32,
@@ -2409,6 +2693,7 @@ pub unsafe fn blend_func_separate(src_rgb: u32, dst_rgb: u32, src_alpha: u32, ds
     );
 }
 
+#[inline]
 pub unsafe fn blend_func_separate_draw_buffer(
     draw_buffer: u32,
     src_rgb: u32,
@@ -2425,26 +2710,32 @@ pub unsafe fn blend_func_separate_draw_buffer(
     );
 }
 
+#[inline]
 pub unsafe fn stencil_func(func: u32, reference: i32, mask: u32) {
     native_gl::glStencilFunc(func as u32, reference, mask);
 }
 
+#[inline]
 pub unsafe fn stencil_func_separate(face: u32, func: u32, reference: i32, mask: u32) {
     native_gl::glStencilFuncSeparate(face as u32, func as u32, reference, mask);
 }
 
+#[inline]
 pub unsafe fn stencil_mask(mask: u32) {
     native_gl::glStencilMask(mask);
 }
 
+#[inline]
 pub unsafe fn stencil_mask_separate(face: u32, mask: u32) {
     native_gl::glStencilMaskSeparate(face as u32, mask);
 }
 
+#[inline]
 pub unsafe fn stencil_op(stencil_fail: u32, depth_fail: u32, pass: u32) {
     native_gl::glStencilOp(stencil_fail as u32, depth_fail as u32, pass as u32);
 }
 
+#[inline]
 pub unsafe fn stencil_op_separate(face: u32, stencil_fail: u32, depth_fail: u32, pass: u32) {
     native_gl::glStencilOpSeparate(
         face as u32,
@@ -2454,6 +2745,7 @@ pub unsafe fn stencil_op_separate(face: u32, stencil_fail: u32, depth_fail: u32,
     );
 }
 
+#[inline]
 pub unsafe fn debug_message_control(
     source: u32,
     msg_type: u32,
@@ -2477,6 +2769,7 @@ pub unsafe fn debug_message_control(
     );
 }
 
+#[inline]
 pub unsafe fn debug_message_insert<S>(source: u32, msg_type: u32, id: u32, severity: u32, msg: S)
 where
     S: AsRef<str>,
@@ -2493,6 +2786,7 @@ where
     );
 }
 
+#[inline]
 pub unsafe fn debug_message_callback<F>(mut callback: F)
 where
     F: FnMut(u32, u32, u32, u32, &str),
@@ -2503,6 +2797,7 @@ where
     );
 }
 
+#[inline]
 pub unsafe fn get_debug_message_log(count: u32) -> Vec<DebugMessageLogEntry> {
     let ct = count as usize;
     let mut sources = Vec::with_capacity(ct);
@@ -2548,6 +2843,7 @@ pub unsafe fn get_debug_message_log(count: u32) -> Vec<DebugMessageLogEntry> {
     entries
 }
 
+#[inline]
 pub unsafe fn push_debug_group<S>(source: u32, id: u32, message: S)
 where
     S: AsRef<str>,
@@ -2557,10 +2853,12 @@ where
     native_gl::glPushDebugGroup(source, id, length, msg.as_ptr() as *const native_gl::GLchar);
 }
 
+#[inline]
 pub unsafe fn pop_debug_group() {
     native_gl::glPopDebugGroup();
 }
 
+#[inline]
 pub unsafe fn object_label<S>(identifier: u32, name: u32, label: Option<S>)
 where
     S: AsRef<str>,
@@ -2580,6 +2878,7 @@ where
     }
 }
 
+#[inline]
 pub unsafe fn get_object_label(identifier: u32, name: u32) -> String {
     let max_label_length = get_parameter_i32(MAX_LABEL_LENGTH);
     let mut len = 0;
@@ -2598,6 +2897,7 @@ pub unsafe fn get_object_label(identifier: u32, name: u32) -> String {
         .to_owned()
 }
 
+#[inline]
 pub unsafe fn object_ptr_label<S>(sync: GlFence, label: Option<S>)
 where
     S: AsRef<str>,
@@ -2616,6 +2916,7 @@ where
     }
 }
 
+#[inline]
 pub unsafe fn get_object_ptr_label(sync: GlFence) -> String {
     let max_label_length = get_parameter_i32(MAX_LABEL_LENGTH);
     let mut len = 0;
@@ -2633,6 +2934,7 @@ pub unsafe fn get_object_ptr_label(sync: GlFence) -> String {
         .to_owned()
 }
 
+#[inline]
 pub unsafe fn get_uniform_block_index(program: GlProgram, name: &str) -> Option<u32> {
     let name = CString::new(name).unwrap();
     let index = native_gl::glGetUniformBlockIndex(program.0.get(), name.as_ptr());
@@ -2643,10 +2945,12 @@ pub unsafe fn get_uniform_block_index(program: GlProgram, name: &str) -> Option<
     }
 }
 
+#[inline]
 pub unsafe fn uniform_block_binding(program: GlProgram, index: u32, binding: u32) {
     native_gl::glUniformBlockBinding(program.0.get(), index, binding);
 }
 
+#[inline]
 pub unsafe fn get_shader_storage_block_index(program: GlProgram, name: &str) -> Option<u32> {
     let name = CString::new(name).unwrap();
     let index =
@@ -2658,14 +2962,17 @@ pub unsafe fn get_shader_storage_block_index(program: GlProgram, name: &str) -> 
     }
 }
 
+#[inline]
 pub unsafe fn shader_storage_block_binding(program: GlProgram, index: u32, binding: u32) {
     native_gl::glShaderStorageBlockBinding(program.0.get(), index, binding);
 }
 
+#[inline]
 pub unsafe fn read_buffer(src: u32) {
     native_gl::glReadBuffer(src);
 }
 
+#[inline]
 pub unsafe fn read_pixels(
     x: i32,
     y: i32,
@@ -2689,30 +2996,36 @@ pub unsafe fn read_pixels(
     );
 }
 
+#[inline]
 pub unsafe fn begin_query(target: u32, query: GlQuery) {
     native_gl::glBeginQuery(target, query.0.get());
 }
 
+#[inline]
 pub unsafe fn end_query(target: u32) {
     native_gl::glEndQuery(target);
 }
 
+#[inline]
 pub unsafe fn get_query_parameter_u32(query: GlQuery, parameter: u32) -> u32 {
     let mut value = 0;
     native_gl::glGetQueryObjectuiv(query.0.get(), parameter, &mut value);
     value
 }
 
+#[inline]
 pub unsafe fn create_transform_feedback() -> Result<GlTransformFeedback, String> {
     let mut name = 0;
     native_gl::glGenTransformFeedbacks(1, &mut name);
     Ok(GlTransformFeedback(non_zero_u32_gl_name(name)))
 }
 
+#[inline]
 pub unsafe fn delete_transform_feedback(transform_feedback: GlTransformFeedback) {
     native_gl::glDeleteTransformFeedbacks(1, &transform_feedback.0.get());
 }
 
+#[inline]
 pub unsafe fn bind_transform_feedback(
     target: u32,
     transform_feedback: Option<GlTransformFeedback>,
@@ -2723,22 +3036,27 @@ pub unsafe fn bind_transform_feedback(
     );
 }
 
+#[inline]
 pub unsafe fn begin_transform_feedback(primitive_mode: u32) {
     native_gl::glBeginTransformFeedback(primitive_mode);
 }
 
+#[inline]
 pub unsafe fn end_transform_feedback() {
     native_gl::glEndTransformFeedback();
 }
 
+#[inline]
 pub unsafe fn pause_transform_feedback() {
     native_gl::glPauseTransformFeedback();
 }
 
+#[inline]
 pub unsafe fn resume_transform_feedback() {
     native_gl::glResumeTransformFeedback();
 }
 
+#[inline]
 pub unsafe fn transform_feedback_varyings(program: GlProgram, varyings: &[&str], buffer_mode: u32) {
     let strings: Vec<CString> = varyings
         .iter()
@@ -2756,6 +3074,7 @@ pub unsafe fn transform_feedback_varyings(program: GlProgram, varyings: &[&str],
     );
 }
 
+#[inline]
 pub unsafe fn get_transform_feedback_varying(
     program: GlProgram,
     index: u32,
@@ -2783,14 +3102,17 @@ pub unsafe fn get_transform_feedback_varying(
     Some(ActiveTransformFeedback { size, tftype, name })
 }
 
+#[inline]
 pub unsafe fn memory_barrier(barriers: u32) {
     native_gl::glMemoryBarrier(barriers);
 }
 
+#[inline]
 pub unsafe fn memory_barrier_by_region(barriers: u32) {
     native_gl::glMemoryBarrierByRegion(barriers);
 }
 
+#[inline]
 pub unsafe fn bind_image_texture(
     unit: u32,
     texture: GlTexture,
@@ -2810,6 +3132,7 @@ pub unsafe fn bind_image_texture(
         format,
     );
 }
+#[inline]
 pub unsafe fn get_active_uniform_block_parameter_i32(
     program: GlProgram,
     uniform_block_index: u32,
@@ -2825,6 +3148,7 @@ pub unsafe fn get_active_uniform_block_parameter_i32(
     value
 }
 
+#[inline]
 pub unsafe fn get_active_uniform_block_parameter_i32_slice(
     program: GlProgram,
     uniform_block_index: u32,
@@ -2838,6 +3162,7 @@ pub unsafe fn get_active_uniform_block_parameter_i32_slice(
         out.as_mut_ptr(),
     );
 }
+#[inline]
 pub unsafe fn get_active_uniform_block_name(
     program: GlProgram,
     uniform_block_index: u32,

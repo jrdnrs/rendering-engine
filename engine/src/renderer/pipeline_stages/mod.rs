@@ -1,6 +1,7 @@
 use super::state::RendererState;
 use crate::{
     components::Renderable,
+    graphics::state::RasteriserState,
     memory_manager::memory_manager::MemoryManager,
     resource_manager::resource_manager::{FramebufferID, ResourcesManager},
 };
@@ -50,6 +51,7 @@ pub trait PipelineStage {
         memory_manager: &mut MemoryManager,
         resource_manager: &mut ResourcesManager,
         renderer_state: &mut RendererState,
+        rasteriser_state: &mut RasteriserState,
         renderables: &[Renderable],
     );
 }

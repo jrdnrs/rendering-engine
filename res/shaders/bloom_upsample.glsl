@@ -40,8 +40,7 @@ void main() {
         samples[i] = textureLod(read_image, normalisedTexelCoord, READ_MIP_LEVEL).rgb;
     }
 
-    memoryBarrierShared();
-    // barrier();
+    groupMemoryBarrier();
 
     uint middleIndex = (gl_LocalInvocationID.x + SAMPLE_RADIUS) + (gl_LocalInvocationID.y + SAMPLE_RADIUS) * GROUP_SAMPLES_WIDTH;
     

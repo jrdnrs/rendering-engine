@@ -5,7 +5,7 @@
 #define READ_IMAGE_SIZE         vector1.xy
 #define READ_MIP_LEVEL          index1
 
-#define THRESHOLD               0.3
+#define THRESHOLD               0.35
 
 #define GROUP_WIDTH             16
 #define GROUP_COUNT             (GROUP_WIDTH * GROUP_WIDTH)
@@ -47,8 +47,7 @@ void main() {
         samples[i] = textureLod(read_image, normalisedTexelCoord, READ_MIP_LEVEL).rgb;
     }
 
-    memoryBarrierShared();
-    // barrier();
+    groupMemoryBarrier();
 
     uint middleIndex = (gl_LocalInvocationID.x + SAMPLE_RADIUS) + (gl_LocalInvocationID.y + SAMPLE_RADIUS) * GROUP_SAMPLES_WIDTH;
     
